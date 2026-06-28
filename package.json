@@ -3,16 +3,25 @@
   "productName": "快麦 ERP 工具箱",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22 <24"
+  },
   "description": "快麦 ERP 桌面小工具集合",
   "main": ".vite/build/index.js",
   "scripts": {
     "postinstall": "node scripts/ensure-electron.mjs",
     "start": "electron-forge start",
     "package": "electron-forge package",
+    "premake": "node scripts/generate-app-icons.mjs",
     "make": "electron-forge make",
+    "make:linux": "electron-forge make --platform=linux --arch=x64 --targets=@electron-forge/maker-deb",
+    "make:win": "electron-forge make --platform=win32 --arch=x64",
+    "make:mac": "electron-forge make --platform=darwin --arch=universal",
+    "icons:generate": "node scripts/generate-app-icons.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "verify:oss": "tsx scripts/verify-oss-upload.ts"
+    "verify:oss": "tsx scripts/verify-oss-upload.ts",
+    "smoke:sku": "tsx scripts/run-sku-smoke.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.2",
@@ -23,6 +32,8 @@
     "clsx": "^2.1.1",
     "dotenv": "^16.4.7",
     "electron-squirrel-startup": "^1.0.1",
+    "fast-xml-parser": "^5.9.3",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.475.0",
     "radix-ui": "^1.6.0",
     "react": "^19.0.0",
@@ -34,6 +45,7 @@
   "devDependencies": {
     "@electron-forge/cli": "^7.8.0",
     "@electron-forge/maker-deb": "^7.8.0",
+    "@electron-forge/maker-dmg": "^7.8.0",
     "@electron-forge/maker-rpm": "^7.8.0",
     "@electron-forge/maker-squirrel": "^7.8.0",
     "@electron-forge/maker-zip": "^7.8.0",
@@ -47,15 +59,13 @@
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^34.2.0",
+    "png-to-ico": "^2.1.8",
+    "png2icons": "^2.0.1",
+    "sharp": "^0.33.5",
     "tailwindcss": "^4.0.9",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "vite": "^6.2.0",
     "vitest": "^3.0.7"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron"
-    ]
   }
 }

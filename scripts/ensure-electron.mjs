@@ -7,10 +7,25 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const electronDir = path.join(rootDir, 'node_modules', 'electron');
 const pathFile = path.join(electronDir, 'path.txt');
-const electronExe = path.join(electronDir, 'dist', 'electron.exe');
+
+function getPlatformPath() {
+  switch (process.platform) {
+    case 'darwin':
+      return 'Electron.app/Contents/MacOS/Electron';
+    case 'linux':
+      return 'electron';
+    case 'win32':
+      return 'electron.exe';
+    default:
+      return 'electron';
+  }
+}
+
+const platformPath = getPlatformPath();
+const electronBinary = path.join(electronDir, 'dist', platformPath);
 
 if (!fs.existsSync(path.join(electronDir, 'install.js'))) {
   process.exit(0);
@@ -18,7 +33,7 @@ if (!fs.existsSync(path.join(electronDir, 'install.js'))) {
 
 const needsInstall =
   !fs.existsSync(pathFile) ||
-  !fs.existsSync(electronExe);
+  !fs.existsSync(electronBinary);
 
 if (needsInstall) {
   const result = spawnSync(process.execPath, ['install.js'], {
@@ -35,6 +50,6 @@ if (needsInstall) {
   }
 }
 
-if (!fs.existsSync(pathFile) && fs.existsSync(electronExe)) {
-  fs.writeFileSync(pathFile, process.platform === 'win32' ? 'electron.exe' : 'electron');
+if (!fs.existsSync(pathFile) && fs.existsSync(electronBinary)) {
+  fs.writeFileSync(pathFile, platformPath);
 }

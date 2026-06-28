@@ -20,6 +20,7 @@ export interface ErpLoginCredentials {
 
 export interface ErpLoginSession {
   cookieHeader: string;
+  accessToken?: string;
   message?: string;
 }
 
@@ -57,6 +58,21 @@ export function normalizeErpBaseUrl(baseUrl = DEFAULT_ERP_BASE_URL): string {
 
 export function serializeCookieJar(jar: CookieJar): string {
   return [...jar.entries()].map(([name, value]) => `${name}=${value}`).join('; ');
+}
+
+export function resolveErpAccessTokenFromCookie(cookieHeader: string): string | undefined {
+  for (const part of cookieHeader.split(';')) {
+    const trimmed = part.trim();
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) {
+      continue;
+    }
+    const name = trimmed.slice(0, eq).trim();
+    if (name === 'accessToken' || name === 'access_token') {
+      return trimmed.slice(eq + 1).trim();
+    }
+  }
+  return undefined;
 }
 
 export function parseSetCookieHeader(setCookie: string): { name: string; value: string } | null {
@@ -130,6 +146,7 @@ function parseLoginResponse(raw: string): {
   success: boolean;
   message?: string;
   needsPhoneVerify?: boolean;
+  accessToken?: string;
 } {
   try {
     const data = JSON.parse(raw) as Record<string, unknown>;
@@ -139,6 +156,10 @@ function parseLoginResponse(raw: string): {
         : undefined;
     const status = typeof payload?.status === 'string' ? payload.status : undefined;
     const message = typeof data.message === 'string' ? data.message : undefined;
+    const accessToken =
+      (typeof payload?.accessToken === 'string' && payload.accessToken) ||
+      (typeof data.accessToken === 'string' && data.accessToken) ||
+      undefined;
 
     if (status === 'login_verify_random') {
       return {
@@ -158,7 +179,7 @@ function parseLoginResponse(raw: string): {
     const result = data.result;
 
     if (result === 1 || result === '1' || result === true) {
-      return { success: true, message };
+      return { success: true, message, accessToken };
     }
 
     return {
@@ -230,6 +251,7 @@ export async function loginToErp(credentials: ErpLoginCredentials): Promise<ErpL
 
   return {
     cookieHeader: serializeCookieJar(jar),
+    accessToken: parsed.accessToken ?? resolveErpAccessTokenFromCookie(serializeCookieJar(jar)),
     message: parsed.message,
   };
 }
