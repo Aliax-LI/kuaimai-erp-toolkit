@@ -1,13 +1,10 @@
-import { LayoutDashboard } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Settings } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 import { SidebarBrand } from '@/components/layout/sidebar/SidebarBrand';
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -16,6 +13,8 @@ import {
 
 const navItems = [
   { to: '/workbench', icon: LayoutDashboard, label: '工作台' },
+  { to: '/tasks', icon: ListTodo, label: '任务列表' },
+  { to: '/settings', icon: Settings, label: '设置' },
 ] as const;
 
 export function AppSidebar() {
@@ -26,27 +25,22 @@ export function AppSidebar() {
       <SidebarBrand />
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>应用</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.to}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location.pathname === item.to}
-                    tooltip={item.label}
-                  >
-                    <NavLink to={item.to}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <SidebarMenu>
+          {navItems.map((item) => (
+            <SidebarMenuItem key={item.to}>
+              <SidebarMenuButton
+                asChild
+                isActive={location.pathname === item.to}
+                tooltip={item.label}
+              >
+                <NavLink to={item.to}>
+                  <item.icon />
+                  <span>{item.label}</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
       </SidebarContent>
 
       <SidebarRail />

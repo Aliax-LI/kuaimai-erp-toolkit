@@ -1,5 +1,4 @@
-import { Moon, Settings, Sun } from 'lucide-react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { Moon, Sun } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -17,8 +16,6 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, actions }: PageHeaderProps) {
   const { resolvedTheme, setTheme } = useTheme();
-  const location = useLocation();
-  const isSettings = location.pathname === '/settings';
 
   const toggleTheme = () => {
     void setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
@@ -44,18 +41,6 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
         <Button variant="ghost" size="icon-sm" onClick={toggleTheme} aria-label="切换主题">
           {resolvedTheme === 'dark' ? <Sun /> : <Moon />}
         </Button>
-        <NavLink to="/settings">
-          {({ isActive }) => (
-            <Button
-              variant={isActive || isSettings ? 'secondary' : 'ghost'}
-              size="icon-sm"
-              aria-label="设置"
-              className={cn((isActive || isSettings) && 'bg-accent')}
-            >
-              <Settings />
-            </Button>
-          )}
-        </NavLink>
       </div>
     </header>
   );

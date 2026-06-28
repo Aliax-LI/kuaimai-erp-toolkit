@@ -1,82 +1,130 @@
-import { Boxes, Sparkles, Wrench } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { FileSpreadsheet, Upload } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-import {
-  PagePanelBody,
-  PagePanelHeader,
-  PageSurface,
-} from '@/components/layout/page-canvas/PageCanvas';
-import { Badge } from '@/components/ui/badge';
-
-const highlights = [
-  {
-    icon: Wrench,
-    title: '工具化操作',
-    description: '将 ERP 重复性操作封装为独立工具，一键批量执行。',
-  },
-  {
-    icon: Boxes,
-    title: '模块化扩展',
-    description: '按 PRD 逐步接入业务工具，侧栏导航即开即用。',
-  },
-  {
-    icon: Sparkles,
-    title: '本地安全存储',
-    description: '凭证加密保存在 userData，界面不回显敏感明文。',
-  },
-] as const;
+import { PagePanelBody, PageSurface } from '@/components/layout/page-canvas/PageCanvas';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSkuImportTasks } from '@/hooks/use-sku-import-tasks';
+import { kuaimai, logRenderer } from '@/lib/kuaimai-client';
+import { TaskSummaryCard } from '@/tools/sku-import/task-summary-card';
 
 export function WorkbenchPage() {
+  const { tasks, loading, executingTaskId, refreshTasks, executeTask, previewFile } =
+    useSkuImportTasks();
+  const [filePath, setFilePath] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const latestTask = tasks[0] ?? null;
+
+  useEffect(() => {
+    void refreshTasks().catch((err) => {
+      logRenderer('error', 'workbench', 'list tasks failed', { error: String(err) });
+    });
+  }, [refreshTasks]);
+
+  const handlePickFile = async () => {
+    setMessage(null);
+    const picked = await kuaimai.skuImport.pickFile();
+    if (!picked) {
+      return;
+    }
+    setFilePath(picked);
+  };
+
+  const handlePreview = async () => {
+    if (!filePath) {
+      setMessage('请先选择 Excel 文件');
+      return;
+    }
+
+    setMessage(null);
+    try {
+      const detail = await previewFile(filePath);
+      setMessage(`已创建预演任务，可执行 ${detail.readyCount} 条`);
+    } catch (err) {
+      const text = err instanceof Error ? err.message : String(err);
+      logRenderer('error', 'workbench', 'preview failed', { error: text });
+      setMessage(`预演失败：${text}`);
+    }
+  };
+
+  const handleExecute = async () => {
+    if (!latestTask) {
+      return;
+    }
+    setMessage(null);
+    try {
+      const detail = await executeTask(latestTask.taskId);
+      setMessage(
+        `执行完成：成功 ${detail.executeResult?.succeededCount ?? 0}，失败 ${detail.executeResult?.failedCount ?? 0}，跳过 ${detail.executeResult?.skippedCount ?? 0}`,
+      );
+    } catch (err) {
+      const text = err instanceof Error ? err.message : String(err);
+      setMessage(`执行失败：${text}`);
+    }
+  };
+
+  const showSettingsHint = message?.includes('设置') || message?.includes('Cookie');
+
   return (
     <PageSurface>
-      <section className="relative shrink-0 overflow-hidden border-b px-6 py-8 lg:px-8 lg:py-10">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-transparent" />
-        <div className="relative flex flex-col gap-4">
-          <Badge variant="secondary" className="w-fit">
-            快麦 ERP 桌面工具箱
-          </Badge>
-          <div className="flex flex-col gap-2">
-            <h2 className="text-2xl font-semibold tracking-tight lg:text-3xl">
-              欢迎使用快麦 ERP 工具箱
-            </h2>
-            <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground lg:text-base">
-              桌面小工具集合，用于提升快麦 ERP 日常操作效率。请从左侧导航进入各工具，或在设置页配置 ERP
-              凭证。
-            </p>
-          </div>
-        </div>
-      </section>
+      <PagePanelBody className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">导入 Excel</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <p className="truncate text-sm">{filePath ?? '尚未选择文件'}</p>
+              <p className="text-xs text-muted-foreground">支持工作表「待创建货号记录」</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => void handlePickFile()}>
+                <Upload />
+                选择 Excel
+              </Button>
+              <Button
+                type="button"
+                disabled={!filePath || loading}
+                onClick={() => void handlePreview()}
+              >
+                <FileSpreadsheet />
+                {loading ? '预演中…' : '开始预演'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-      <section className="grid shrink-0 gap-px border-b bg-border sm:grid-cols-2 xl:grid-cols-3">
-        {highlights.map((item) => (
-          <div key={item.title} className="flex flex-col gap-3 bg-background p-6">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <item.icon />
-            </div>
-            <div className="flex flex-col gap-1">
-              <h3 className="text-sm font-semibold">{item.title}</h3>
-              <p className="text-sm text-muted-foreground">{item.description}</p>
-            </div>
-          </div>
-        ))}
-      </section>
+        {latestTask ? (
+          <TaskSummaryCard
+            task={latestTask}
+            executing={executingTaskId === latestTask.taskId || latestTask.status === 'executing'}
+            onExecute={() => void handleExecute()}
+          />
+        ) : (
+          <Card>
+            <CardContent className="py-12 text-center text-sm text-muted-foreground">
+              暂无任务，导入 Excel 并预演后将在此显示最新任务
+            </CardContent>
+          </Card>
+        )}
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        <PagePanelHeader
-          title="工具列表"
-          description="当前暂无已注册工具，后续将按 PRD 逐步接入"
-        />
-        <PagePanelBody className="flex flex-1 items-center justify-center">
-          <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <div className="flex size-14 items-center justify-center rounded-full bg-muted">
-              <Boxes className="text-muted-foreground" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium">暂无可用工具</p>
-              <p className="text-xs text-muted-foreground">接入后将显示在工作台与侧栏导航中</p>
-            </div>
-          </div>
-        </PagePanelBody>
-      </div>
+        {message && (
+          <Alert>
+            <AlertTitle>{message.includes('失败') ? '提示' : '完成'}</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2">
+              <span>{message}</span>
+              {showSettingsHint && (
+                <Link to="/settings" className="text-primary underline-offset-4 hover:underline">
+                  前往设置
+                </Link>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+      </PagePanelBody>
     </PageSurface>
   );
 }

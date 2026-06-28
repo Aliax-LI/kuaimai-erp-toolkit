@@ -36,6 +36,13 @@ export const kuaimai = {
     }
     return api;
   },
+  get skuImport() {
+    const api = getKuaimai().skuImport;
+    if (!api?.pickFile || !api?.preview || !api?.execute || !api?.listTasks || !api?.getTask) {
+      throw new Error('建货号 API 未加载，请完全退出后重新启动应用');
+    }
+    return api;
+  },
 };
 
 export function logRenderer(
