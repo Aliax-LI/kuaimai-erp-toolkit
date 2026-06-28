@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
+import { DEFAULT_ERP_BASE_URL } from '@shared/constants/erp';
+
 export const appSettingsSchema = z.object({
   theme: z.enum(['light', 'dark', 'system']).default('dark'),
   locale: z.literal('zh-CN').default('zh-CN'),
+  erpBaseUrl: z.string().url().default(DEFAULT_ERP_BASE_URL),
 });
 
 export const secretsSchema = z.record(z.string()).default({});
@@ -21,6 +24,7 @@ export type AppStore = z.infer<typeof appStoreSchema>;
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   theme: 'dark',
   locale: 'zh-CN',
+  erpBaseUrl: DEFAULT_ERP_BASE_URL,
 };
 
 export function createDefaultStore(): AppStore {
