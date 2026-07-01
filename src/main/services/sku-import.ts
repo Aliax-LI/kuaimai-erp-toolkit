@@ -15,6 +15,7 @@ import { createErpWebClient } from '../../core/erp-web-client';
 import { createErpCatalogClient } from '../../tools/sku-import/erp-catalog';
 import { executeSkuImportRows } from '../../tools/sku-import/executor';
 import { buildSkuImportPreview } from '../../tools/sku-import/preview';
+import { getSkuImportConfig } from './sku-import-config';
 import { verifyCreatedSkuImportRow } from '../../tools/sku-import/verify-created-items';
 import {
   applySkuImportWorkbookResults,
@@ -225,7 +226,13 @@ export async function previewSkuImportFile(filePath: string): Promise<SkuImportT
     taskId,
   });
 
-  const preview = await buildSkuImportPreview(taskId, filePath, parsed, catalog);
+  const preview = await buildSkuImportPreview(
+    taskId,
+    filePath,
+    parsed,
+    catalog,
+    getSkuImportConfig(),
+  );
   const task: SkuImportJobRecord = {
     id: taskId,
     filePath,

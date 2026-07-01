@@ -25,17 +25,17 @@ describe('sku-import domain', () => {
     ).toBe('YP-CJJ01-01|07460088|除胶剂50g黑瓶喷雾');
   });
 
-  it('buildSkuCodePrefix 应从原品编码提取缩写并带 test 前缀', () => {
-    expect(buildSkuCodePrefix('WKAU', 'YP-CJJ01-01', '强力除胶剂')).toBe('test-69-WKAU-CJJ01');
+  it('buildSkuCodePrefix 应使用配置品牌编码与原品缩写', () => {
+    expect(buildSkuCodePrefix('39', 'YP-CJJ01-01', '强力除胶剂')).toBe('test-69-39-CJJ01');
   });
 
   it('allocateNextSkuCode 应基于已有货号递增', () => {
-    const next = allocateNextSkuCode('test-69-WKAU-CJJ01', [
-      'test-69-WKAU-CJJ01001',
-      'test-69-WKAU-CJJ01007',
-      'test-69-WKAU-OTHER001',
+    const next = allocateNextSkuCode('test-69-39-CJJ01', [
+      'test-69-39-CJJ01001',
+      'test-69-39-CJJ01007',
+      'test-69-39-OTHER001',
     ]);
-    expect(next).toBe('test-69-WKAU-CJJ01008');
+    expect(next).toBe('test-69-39-CJJ01008');
   });
 
   it('buildStickerTitle 应拼接贴纸名称', () => {

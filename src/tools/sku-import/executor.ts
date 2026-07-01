@@ -187,6 +187,13 @@ export async function executeSkuImportRows(options: {
         previewRow.matchedAccessoryCodes,
       );
 
+      const productOriginalBridge = await options.catalog.buildBridgeEntryForOuterId(
+        previewRow.productOriginalOuterId,
+      );
+      if (!productOriginalBridge) {
+        throw new Error(`产品原品不存在或无法解析 bridge: ${previewRow.productOriginalOuterId}`);
+      }
+
       await options.catalog.createPureSuite({
         outerId: bundleOuterId,
         title: previewRow.bundleTitle,
@@ -195,7 +202,7 @@ export async function executeSkuImportRows(options: {
         component: normalized.component,
         standard: normalized.standard,
         picPath: imageUrl,
-        itemSuiteBridgeList: [...accessoryBridges, stickerBridge],
+        itemSuiteBridgeList: [productOriginalBridge, ...accessoryBridges, stickerBridge],
       });
 
       rowResults.push({

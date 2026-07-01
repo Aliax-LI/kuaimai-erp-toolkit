@@ -25,6 +25,24 @@ export interface ErpCatalogItem {
   }>;
 }
 
+/** 按主货号或 SKU 子货号匹配（与 buildBridgeEntryForOuterId 一致） */
+export function findCatalogItemByOuterId(
+  items: ErpCatalogItem[],
+  outerId: string,
+): ErpCatalogItem | undefined {
+  const normalized = outerId.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  const exact = items.find((item) => item.outerId === normalized);
+  if (exact) {
+    return exact;
+  }
+
+  return items.find((item) => item.skus?.some((sku) => sku.skuOuterId === normalized));
+}
+
 export interface ErpCatalogClient {
   listAllOuterIds(): Promise<string[]>;
   listOuterIdsByPrefix(prefix: string, maxPages?: number): Promise<string[]>;
@@ -385,12 +403,13 @@ export function createErpCatalogClient(config: ErpWebConfig): ErpCatalogClient {
 
     async buildBridgeEntryForOuterId(outerId: string): Promise<SuiteBridgeEntry | null> {
       const items = await this.getItemsByOuterIds([outerId]);
-      const hit = items.find((item) => item.outerId === outerId) ?? items[0];
+      const hit = findCatalogItemByOuterId(items, outerId);
       if (!hit?.sysItemId) {
         return null;
       }
       const detail = await this.getItemDetailRecord(hit.sysItemId);
-      const preferredSkuOuterId = hit.skus?.[0]?.skuOuterId;
+      const preferredSkuOuterId = hit.skus?.find((sku) => sku.skuOuterId === outerId)?.skuOuterId
+        ?? hit.skus?.[0]?.skuOuterId;
       return bridgeEntryFromItemDetail(detail, preferredSkuOuterId);
     },
 

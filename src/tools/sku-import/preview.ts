@@ -1,17 +1,22 @@
 import type { MatchedAccessorySku } from '@shared/types/sku-import';
 import type { SkuImportPreviewRow, SkuImportPreviewResult } from '@shared/types/sku-import';
+import type { SkuImportConfig } from '@shared/schemas/sku-import-config';
 
 import {
   BUNDLE_CATEGORY_NAME,
   STICKER_CATEGORY_NAME,
 } from './constants';
 import {
+  matchAccessoriesFromConfig,
+  resolveBrandCodeFromConfig,
+} from './catalog-config';
+import {
   allocateNextSkuCode,
-  buildBundleTitle,
   buildBusinessKey,
   buildSkuCodePrefix,
   buildStickerOuterId,
   buildStickerTitle,
+  buildBundleTitle,
   normalizeImportRowValues,
   parseAccessoryNames,
   validateImportRow,
@@ -21,28 +26,32 @@ import type { ParsedSkuImportWorkbook } from './workbook';
 
 async function resolveMatchedAccessorySkus(
   catalog: ErpCatalogClient,
-  accessoryNames: string[],
-  matchedItemOuterIds: string[],
-): Promise<MatchedAccessorySku[]> {
-  const result: MatchedAccessorySku[] = [];
-  for (let index = 0; index < accessoryNames.length; index++) {
-    const name = accessoryNames[index];
-    const itemOuterId = matchedItemOuterIds[index];
-    if (!name || !itemOuterId) {
+  configMatches: Array<{ name: string; skuCode: string }>,
+): Promise<{ matched: MatchedAccessorySku[]; missing: string[] }> {
+  const matched: MatchedAccessorySku[] = [];
+  const missing: string[] = [];
+
+  for (const entry of configMatches) {
+    const items = await catalog.getItemsByOuterIds([entry.skuCode]);
+    const item = items.find((row) => row.outerId === entry.skuCode) ?? items[0];
+    if (!item?.outerId) {
+      missing.push(`${entry.name}（ERP 未找到货号 ${entry.skuCode}）`);
       continue;
     }
-    const bridge = await catalog.buildBridgeEntryForOuterId(itemOuterId);
+    const bridge = await catalog.buildBridgeEntryForOuterId(item.outerId);
     if (!bridge) {
-      throw new Error(`无法解析配件 bridge: ${itemOuterId}`);
+      missing.push(`${entry.name}（无法解析 ERP 货号 ${entry.skuCode}）`);
+      continue;
     }
-    result.push({
-      name,
-      itemOuterId,
+    matched.push({
+      name: entry.name,
+      itemOuterId: item.outerId,
       skuOuterId: bridge.outerId,
       sysItemId: bridge.subItemId,
     });
   }
-  return result;
+
+  return { matched, missing };
 }
 
 function previewRowBase(input: {
@@ -52,6 +61,7 @@ function previewRowBase(input: {
   accessories: string[];
   proposedSkuCode: string;
   stickerOuterId: string;
+  productOriginalOuterId: string;
   accessoryMatch: { matched: string[]; missing: string[] };
   matchedAccessorySkus: MatchedAccessorySku[];
 }): Omit<SkuImportPreviewRow, 'status' | 'blockedReason' | 'existingSkuCode'> {
@@ -77,6 +87,7 @@ function previewRowBase(input: {
     ),
     matchedAccessoryCodes: input.accessoryMatch.matched,
     missingAccessoryNames: input.accessoryMatch.missing,
+    productOriginalOuterId: input.productOriginalOuterId,
     stickerOuterId: input.stickerOuterId,
     matchedAccessorySkus: input.matchedAccessorySkus,
     bundleCategory: BUNDLE_CATEGORY_NAME,
@@ -89,6 +100,7 @@ export async function buildSkuImportPreview(
   filePath: string,
   parsed: ParsedSkuImportWorkbook,
   catalog: ErpCatalogClient,
+  importConfig: SkuImportConfig,
 ): Promise<SkuImportPreviewResult> {
   const rows: SkuImportPreviewRow[] = [];
 
@@ -97,15 +109,18 @@ export async function buildSkuImportPreview(
     const normalized = normalizeImportRowValues(row.values);
     const accessories = parseAccessoryNames(normalized.accessoriesRaw);
     const businessKey = buildBusinessKey(row.values);
-    const prefix = buildSkuCodePrefix(
-      normalized.brand,
-      normalized.productCode,
-      normalized.productName,
-    );
+    const productOriginalOuterId = normalized.productCode;
 
-    const prefixOuterIds = normalized.existingSkuCode
-      ? []
-      : await catalog.listOuterIdsByPrefix(prefix);
+    const brandResolved = resolveBrandCodeFromConfig(normalized.brand, importConfig);
+    const prefix =
+      'code' in brandResolved
+        ? buildSkuCodePrefix(brandResolved.code, normalized.productCode, normalized.productName)
+        : '';
+
+    const prefixOuterIds =
+      'code' in brandResolved && !normalized.existingSkuCode
+        ? await catalog.listOuterIdsByPrefix(prefix)
+        : [];
     const proposedSkuCode =
       normalized.existingSkuCode || allocateNextSkuCode(prefix, prefixOuterIds);
     const stickerOuterId = buildStickerOuterId(proposedSkuCode);
@@ -115,10 +130,10 @@ export async function buildSkuImportPreview(
     const bundleExists = existingOuterIds.has(proposedSkuCode);
     const stickerExists = existingOuterIds.has(stickerOuterId);
 
-    const accessoryMatch = await catalog.matchAccessoriesForImport(
-      normalized.brand,
-      normalized.productName,
+    const configAccessoryMatch = matchAccessoriesFromConfig(
       accessories,
+      normalized.brand,
+      importConfig,
     );
 
     const base = previewRowBase({
@@ -128,7 +143,11 @@ export async function buildSkuImportPreview(
       accessories,
       proposedSkuCode,
       stickerOuterId,
-      accessoryMatch,
+      productOriginalOuterId,
+      accessoryMatch: {
+        matched: configAccessoryMatch.matched.map((item) => item.skuCode),
+        missing: configAccessoryMatch.missing,
+      },
       matchedAccessorySkus: [],
     });
 
@@ -137,6 +156,25 @@ export async function buildSkuImportPreview(
         ...base,
         status: 'preview_blocked',
         blockedReason: validationError,
+      });
+      continue;
+    }
+
+    if ('error' in brandResolved) {
+      rows.push({
+        ...base,
+        status: 'preview_blocked',
+        blockedReason: brandResolved.error,
+      });
+      continue;
+    }
+
+    const productOriginalItems = await catalog.getItemsByOuterIds([productOriginalOuterId]);
+    if (!productOriginalItems[0]?.outerId) {
+      rows.push({
+        ...base,
+        status: 'preview_blocked',
+        blockedReason: `产品原品「${productOriginalOuterId}」在 ERP 中不存在`,
       });
       continue;
     }
@@ -152,24 +190,31 @@ export async function buildSkuImportPreview(
       continue;
     }
 
-    if (accessoryMatch.missing.length > 0) {
+    if (configAccessoryMatch.missing.length > 0) {
       rows.push({
         ...base,
         status: 'preview_blocked',
-        blockedReason: `未匹配配件: ${accessoryMatch.missing.join('、')}`,
+        blockedReason: `未匹配配件: ${configAccessoryMatch.missing.join('、')}`,
       });
       continue;
     }
 
-    const matchedAccessorySkus = await resolveMatchedAccessorySkus(
-      catalog,
-      accessories,
-      accessoryMatch.matched,
-    );
+    const { matched: matchedAccessorySkus, missing: erpAccessoryMissing } =
+      await resolveMatchedAccessorySkus(catalog, configAccessoryMatch.matched);
+
+    if (erpAccessoryMissing.length > 0) {
+      rows.push({
+        ...base,
+        status: 'preview_blocked',
+        blockedReason: erpAccessoryMissing.join('、'),
+      });
+      continue;
+    }
 
     rows.push({
       ...base,
       matchedAccessorySkus,
+      matchedAccessoryCodes: matchedAccessorySkus.map((item) => item.itemOuterId),
       status: 'pending',
       blockedReason:
         stickerExists && !bundleExists

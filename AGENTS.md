@@ -22,7 +22,7 @@ Renderer（React）→ preload（contextBridge）→ Main（Node）→ Core / To
 |---|---|
 | 桌面 | Electron 34+、Electron Forge（Vite 模板） |
 | 前端 | React 19、TypeScript 5 |
-| 样式 | Tailwind CSS 4、shadcn/ui、lucide-react |
+| 样式 | Tailwind CSS 4、framer-motion、lucide-react、Noto Sans SC |
 | 校验 | Zod |
 | 持久化 | `store.json`（`main/services/store.ts`，敏感字段 AES 加密） |
 | 测试 | Vitest |
@@ -90,82 +90,85 @@ Renderer  →  window.kuaimai.*  →  preload/apis/  →  main/ipc/  →  main/s
 
 ### 设计体系
 
-- 组件：shadcn/ui；图标：lucide-react；字体：系统 UI 栈。
-- 默认 **暗色主题**，支持亮/暗/跟随系统（设置页）；顶栏右侧 **日/月图标** 快捷切换。
+- 组件：自定义 primitives + `components/shared/`（从 my-app 暖色 UI 反推）；图标：lucide-react；字体：**Noto Sans SC**。
+- **仅浅色暖色主题**（cream / amber / charcoal）；无暗色切换。
 - **无登录页**：启动直达工作台；侧栏无用户头像、登录/退出。
 
-### 应用骨架（强制：侧栏 + 主区）
+### 应用骨架（强制：顶栏 + 侧栏 + 主区）
 
 ```
-┌──────────┬──────────────────────────────────────────────┐
-│ Logo     │  页面标题                    [主题]          │  PageHeader
-│ 应用名   ├──────────────────────────────────────────────┤
-│ 副标题   │                                              │
-│          │           PageContent（页面自定义）            │
-│ ● 工作台 │   单栏 / 卡片堆叠 / 手风琴列表，由页面决定     │
-│ ● 任务列表│                                              │
-│ ● 设置   │                                              │
-└──────────┴──────────────────────────────────────────────┘
-  Sidebar（12rem）          Main（flex-1，内部滚动）
+┌─────────────────────────────────────────────────────────────┐
+│ Logo + 标题                              [连接状态 · 只读]   │  Header h-14
+├──────────┬──────────────────────────────────────────────────┤
+│ ● 工作台 │                                                  │
+│ ● 历史记录│           PageContent（max-w-6xl 居中）            │
+│ ● 配置管理│                                                  │
+│ v2.0     │                                                  │
+└──────────┴──────────────────────────────────────────────────┘
+  Sidebar（188px）          Main（flex-1，overflow-y-auto）
 ```
 
 | 层级 | 规范 |
 |---|---|
-| **Sidebar** | 始终可见；上：品牌区；中：**工作台 / 任务列表 / 设置** 三项导航 |
-| **Main** | 占满剩余宽度；含 `PageHeader` + `PageContent` |
-| **PageHeader** | 左：当前页标题；右：**仅主题切换**（设置入口在侧栏） |
-| **PageContent** | 页面自由布局，常用模式见下表 |
+| **Header** | 全宽顶栏；左：Logo + 应用标题；右：**ERP 连接状态胶囊**（只读，点击跳转配置管理 ERP Tab） |
+| **Sidebar** | 188px；**工作台 / 历史记录 / 配置管理** 三项导航；底：版本文案 |
+| **Main** | `p-6`；内容 `max-w-6xl mx-auto` |
 
 **PageContent 常用模式**：
 
 | 模式 | 结构 | 适用 |
 |---|---|---|
-| 单栏 | 纵向卡片区块 | 工作台、设置 |
-| 手风琴列表 | 可展开任务详情 | 任务列表 |
-| 主 + 底栏 | 内容区 + 底部操作条 | 批量任务（按需） |
+| 三步手风琴 | StepIndicator + AccordionStep × 3 | 工作台 |
+| 表格列表 | 搜索 + DataTable | 历史记录 |
+| Tab 配置 | Segmented Tab + 表单/表格 | 配置管理 |
 
-- 最小窗口 **1024 × 640**；侧栏 `collapsible="icon"`，**不得完全隐藏**。
-- 禁止用顶栏 Tab 替代侧栏导航。
+- 最小窗口 **1024 × 640**；侧栏始终可见，不得完全隐藏。
 
 ### 导航与路由（强制项）
 
 | 路由 | 侧栏 | 说明 |
 |---|---|---|
-| `/workbench` | 工作台 | 默认落地页；导入 Excel、预演、最新任务执行 |
-| `/tasks` | 任务列表 | 全部预演任务；手风琴展开详情；`?expand=<taskId>` 深链 |
-| `/settings` | 设置 | ERP 凭证 + 外观 |
-| `/tools/sku-import` | — | 重定向至 `/workbench`（兼容旧链接） |
+| `/workbench` | 工作台 | 3 步：导入 Excel → 批量创建 → 创建结果；导入后自动预演 |
+| `/history` | 历史记录 | 任务历史表格；「查看」跳转工作台 |
+| `/config` | 配置管理 | `?tab=erp\|brands\|…`；ERP Tab 可保存凭证 |
+| `/tasks` | — | 重定向 `/history` |
+| `/settings` | — | 重定向 `/config?tab=erp` |
+| `/tools/sku-import` | — | 重定向 `/workbench` |
 
-### 设置页
+### 配置管理
 
-- **ERP 连接**：Cookie、companyId、`erpBaseUrl`（默认 `https://erp.superboss.cc`）；敏感项加密，界面不回显明文。
-- **外观**：暗色模式、跟随系统。
-- 桌面应用运行时 **不读** 根目录 `.env`；CLI 脚本（如 `smoke:sku`）仍可用 `.env`。
+- **ERP 连接**（`?tab=erp`）：Cookie、companyId、`erpBaseUrl`；敏感项加密，界面不回显明文。
+- **品牌/配件/编码规则/分类**：首期 UI 外壳（mock / 只读）。
+- 桌面应用运行时 **不读** 根目录 `.env`；CLI 脚本仍可用 `.env`。
 
-### 视觉
+### 视觉（暖色参考）
 
-| 项 | 暗色参考 |
+| 项 | 参考 |
 |---|---|
-| 页面底 | `#0a0a0a` ~ `#111` |
-| 侧栏 | 略深于主区 |
-| 卡片 | `#141414` ~ `#1a1a1a`，细边框，圆角 8–12px |
-| 文字 | 主 `#f5f5f5`，次 `#a3a3a3` |
-| 主按钮 | 高对比填充 + 白字 + 图标 |
+| 页面底 | `#FBF7EF`（cream） |
+| 侧栏 | `#F7EFE1`（cream-warm） |
+| 卡片 | `#FDFBF5`（cream-white），边框 `#E9DCCF`（beige） |
+| 文字 | 主 `#1D1D1D`（charcoal），次 `#A18D7C`（brown-soft） |
+| 主按钮 | `#FF825B`（amber）填充 + 白字 |
 
 ### 布局组件目录
 
 ```
 renderer/components/layout/
-├── AppShell.tsx
-├── app-sidebar.tsx
-├── sidebar/SidebarBrand.tsx
-├── page-header/PageHeader.tsx
-└── page-canvas/PageCanvas.tsx
+├── app-layout.tsx
+├── header.tsx
+└── sidebar.tsx
+
+renderer/components/shared/
+├── step-indicator.tsx
+├── accordion-step.tsx
+├── drag-drop-zone.tsx
+└── …
 
 renderer/pages/
-├── workbench.tsx      # 建货号入口
-├── tasks.tsx          # 任务列表
-└── settings.tsx
+├── workbench.tsx
+├── history.tsx
+└── config.tsx
 ```
 
 ---

@@ -138,10 +138,13 @@ export function ensureUserDataDirs(): void {
   }
 }
 
+function getToolConfigPath(toolId: string): string {
+  return path.join(app.getPath('userData'), 'config', toolId, 'config.json');
+}
+
 export function writeToolConfig(toolId: string, data: Record<string, unknown>): void {
-  const configDir = path.join(app.getPath('userData'), 'config', toolId);
-  fs.mkdirSync(configDir, { recursive: true });
-  const filePath = path.join(configDir, 'config.json');
+  const filePath = getToolConfigPath(toolId);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const tempPath = `${filePath}.tmp`;
   const envelope = {
     schemaVersion: 1,
@@ -150,4 +153,17 @@ export function writeToolConfig(toolId: string, data: Record<string, unknown>): 
   };
   fs.writeFileSync(tempPath, JSON.stringify(envelope, null, 2), 'utf8');
   fs.renameSync(tempPath, filePath);
+}
+
+export function readToolConfig(toolId: string): Record<string, unknown> | null {
+  const filePath = getToolConfigPath(toolId);
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  try {
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf8')) as { data?: Record<string, unknown> };
+    return raw.data ?? null;
+  } catch {
+    return null;
+  }
 }

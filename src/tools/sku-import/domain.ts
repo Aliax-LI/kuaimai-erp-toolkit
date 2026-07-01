@@ -31,10 +31,14 @@ export function buildStickerOuterId(bundleOuterId: string): string {
   return `${bundleOuterId}-ST`;
 }
 
-export function buildSkuCodePrefix(brand: string, productCode: string, productName: string): string {
-  const brandCode = brand.replace(/[^A-Z0-9]/gi, '').toUpperCase() || 'BRAND';
+export function buildSkuCodePrefix(
+  brandCode: string,
+  productCode: string,
+  productName: string,
+): string {
+  const normalizedBrandCode = brandCode.replace(/[^A-Z0-9]/gi, '').toUpperCase() || 'BRAND';
   const abbr = deriveProductAbbreviation(productCode, productName);
-  return `${SKU_CODE_TEST_PREFIX}-${SKU_CODE_PREFIX}-${brandCode}-${abbr}`;
+  return `${SKU_CODE_TEST_PREFIX}-${SKU_CODE_PREFIX}-${normalizedBrandCode}-${abbr}`;
 }
 
 export function allocateNextSkuCode(prefix: string, existingOuterIds: string[]): string {

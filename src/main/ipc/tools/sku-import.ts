@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '@shared/ipc-channels';
+import type { SkuImportConfig } from '@shared/schemas/sku-import-config';
 
 import {
   clearAllSkuImportTasks,
@@ -11,6 +12,7 @@ import {
   pickSkuImportFile,
   previewSkuImportFile,
 } from '../../services/sku-import';
+import { getSkuImportConfig, setSkuImportConfig } from '../../services/sku-import-config';
 import { wrapIpcHandler } from '../wrap-ipc-handler';
 
 export function registerSkuImportIpc(): void {
@@ -57,6 +59,18 @@ export function registerSkuImportIpc(): void {
     IPC_CHANNELS.SKU_IMPORT_EXECUTE,
     wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_EXECUTE, async (_event, taskId: string) =>
       executeSkuImportTask(taskId),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.SKU_IMPORT_CONFIG_GET,
+    wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_CONFIG_GET, async () => getSkuImportConfig()),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.SKU_IMPORT_CONFIG_SET,
+    wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_CONFIG_SET, async (_event, config: SkuImportConfig) =>
+      setSkuImportConfig(config),
     ),
   );
 }

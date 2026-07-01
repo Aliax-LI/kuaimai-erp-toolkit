@@ -52,6 +52,7 @@ export interface SkuImportPreviewRow {
   bundleTitle: string;
   matchedAccessoryCodes: string[];
   missingAccessoryNames: string[];
+  productOriginalOuterId: string;
   stickerOuterId: string;
   matchedAccessorySkus: MatchedAccessorySku[];
   bundleCategory: string;

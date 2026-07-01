@@ -9,6 +9,7 @@ import {
 } from './constants';
 import { buildStickerOuterId } from './domain';
 import type { ErpCatalogClient } from './erp-catalog';
+import { findCatalogItemByOuterId } from './erp-catalog';
 import { resolveErpCategoryId } from './erp-category';
 import { extractBridgeItemIds } from './erp-item-payload';
 import type { ErpWebClient } from '../../core/erp-web-client';
@@ -20,6 +21,7 @@ export interface VerifyStep {
 }
 
 export function verifySuiteBridgeStructure(options: {
+  productOriginalItemId?: number;
   expectedAccessoryItemIds: number[];
   stickerItemId: number;
   bridgeList: Array<Record<string, unknown>>;
@@ -30,6 +32,13 @@ export function verifySuiteBridgeStructure(options: {
     if (sysItemId) {
       bridgeItemIds.add(sysItemId);
     }
+  }
+
+  if (options.productOriginalItemId && !bridgeItemIds.has(options.productOriginalItemId)) {
+    return {
+      ok: false,
+      message: `套装 bridge 缺少产品原品 subItemId=${options.productOriginalItemId}`,
+    };
   }
 
   if (!bridgeItemIds.has(options.stickerItemId)) {
@@ -47,7 +56,8 @@ export function verifySuiteBridgeStructure(options: {
     };
   }
 
-  const expectedCount = 1 + options.expectedAccessoryItemIds.length;
+  const expectedCount =
+    1 + options.expectedAccessoryItemIds.length + (options.productOriginalItemId ? 1 : 0);
   if (bridgeItemIds.size < expectedCount) {
     return {
       ok: false,
@@ -57,7 +67,9 @@ export function verifySuiteBridgeStructure(options: {
 
   return {
     ok: true,
-    message: `bridge 含贴纸 + ${options.expectedAccessoryItemIds.length} 个配件`,
+    message: options.productOriginalItemId
+      ? `bridge 含产品原品 + 贴纸 + ${options.expectedAccessoryItemIds.length} 个配件`
+      : `bridge 含贴纸 + ${options.expectedAccessoryItemIds.length} 个配件`,
   };
 }
 
@@ -163,12 +175,12 @@ export async function verifyCreatedSkuImportRow(
   const bundleOuterId = previewRow.proposedSkuCode;
   const stickerOuterId = buildStickerOuterId(bundleOuterId);
   const accessoryOuterIds = previewRow.matchedAccessoryCodes;
+  const productOriginalOuterId = previewRow.productOriginalOuterId;
 
-  const lookupIds = [stickerOuterId, bundleOuterId, ...accessoryOuterIds];
+  const lookupIds = [stickerOuterId, bundleOuterId, productOriginalOuterId, ...accessoryOuterIds];
   const items = await catalog.getItemsByOuterIds(lookupIds);
-  const byOuterId = new Map(items.map((item) => [item.outerId, item]));
 
-  const sticker = byOuterId.get(stickerOuterId);
+  const sticker = findCatalogItemByOuterId(items, stickerOuterId);
   if (!sticker?.sysItemId) {
     steps.push({ label: '贴纸存在', ok: false, detail: `未找到 outerId=${stickerOuterId}` });
   } else if (sticker.type !== String(ERP_ITEM_TYPE_NORMAL) && sticker.type !== '0') {
@@ -197,7 +209,7 @@ export async function verifyCreatedSkuImportRow(
     steps.push(await verifyItemCategory(client, '贴纸分类', stickerDetail, STICKER_CATEGORY_NAME));
   }
 
-  const bundle = byOuterId.get(bundleOuterId);
+  const bundle = findCatalogItemByOuterId(items, bundleOuterId);
   if (!bundle?.sysItemId) {
     steps.push({ label: '套装存在', ok: false, detail: `未找到 outerId=${bundleOuterId}` });
   } else if (bundle.type !== String(ERP_ITEM_TYPE_SUITE) && bundle.type !== '2') {
@@ -214,9 +226,25 @@ export async function verifyCreatedSkuImportRow(
     });
   }
 
+  const productOriginal = findCatalogItemByOuterId(items, productOriginalOuterId);
+  const productOriginalItemId = productOriginal?.sysItemId;
+  if (!productOriginalItemId) {
+    steps.push({
+      label: '产品原品',
+      ok: false,
+      detail: `未找到 outerId=${productOriginalOuterId}`,
+    });
+  } else {
+    steps.push({
+      label: '产品原品',
+      ok: true,
+      detail: `${productOriginalOuterId} (sysItemId=${productOriginalItemId})`,
+    });
+  }
+
   const accessoryItemIds: number[] = [];
   for (const outerId of accessoryOuterIds) {
-    const item = byOuterId.get(outerId);
+    const item = findCatalogItemByOuterId(items, outerId);
     if (!item?.sysItemId) {
       steps.push({ label: `配件 ${outerId}`, ok: false, detail: '未找到或缺少 sysItemId' });
       continue;
@@ -240,6 +268,7 @@ export async function verifyCreatedSkuImportRow(
     detailRaw && typeof detailRaw === 'object' ? (detailRaw as Record<string, unknown>) : {};
   const bridgeList = extractBridgeList(detail);
   const structure = verifySuiteBridgeStructure({
+    productOriginalItemId,
     expectedAccessoryItemIds: accessoryItemIds,
     stickerItemId,
     bridgeList,

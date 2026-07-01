@@ -14,6 +14,22 @@ describe('verifySuiteBridgeStructure', () => {
       ],
     });
     expect(result.ok).toBe(true);
+    expect(result.message).toContain('贴纸');
+  });
+
+  it('应要求 bridge 含产品原品 subItemId', () => {
+    const result = verifySuiteBridgeStructure({
+      productOriginalItemId: 50,
+      expectedAccessoryItemIds: [101],
+      stickerItemId: 200,
+      bridgeList: [
+        { subItemId: 50, ratio: 1 },
+        { subItemId: 101, ratio: 1 },
+        { sysItemId: 200, ratio: 1 },
+      ],
+    });
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('产品原品');
   });
 
   it('缺少配件时应失败并说明', () => {

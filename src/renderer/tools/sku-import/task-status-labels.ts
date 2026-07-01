@@ -17,6 +17,39 @@ export function rowStatusLabel(status: SkuImportPreviewRow['status']): string {
   }
 }
 
+export type PreviewRowStatusTone = 'success' | 'danger' | 'warning' | 'neutral' | 'progress';
+
+export function previewRowStatusTone(status: SkuImportPreviewRow['status']): PreviewRowStatusTone {
+  switch (status) {
+    case 'pending':
+      return 'success';
+    case 'preview_blocked':
+    case 'failed':
+      return 'danger';
+    case 'skipped_existing':
+      return 'warning';
+    default:
+      return 'neutral';
+  }
+}
+
+export function previewRowReason(row: SkuImportPreviewRow): string {
+  if (row.status === 'preview_blocked') {
+    return row.blockedReason ?? '预演未通过';
+  }
+  if (row.status === 'skipped_existing') {
+    const sku = row.existingSkuCode ?? row.proposedSkuCode;
+    return row.blockedReason ?? (sku ? `ERP 中已存在套装货号 ${sku}` : 'ERP 中已存在套装货号');
+  }
+  if (row.status === 'pending') {
+    if (row.blockedReason) {
+      return row.blockedReason;
+    }
+    return `将创建套装 ${row.proposedSkuCode}`;
+  }
+  return row.blockedReason ?? '—';
+}
+
 export function rowStatusBadgeVariant(
   status: string,
 ): 'default' | 'secondary' | 'destructive' | 'outline' {

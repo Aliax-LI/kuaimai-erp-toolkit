@@ -12,4 +12,4 @@ export const DEFAULT_WINDOW_HEIGHT = MIN_WINDOW_HEIGHT;
 export const SHELL_HEADER_HEIGHT_CLASS = 'h-14 shrink-0';
 
 /** 侧栏展开宽度（默认 shadcn 为 16rem，收窄以让主内容区更靠左） */
-export const SIDEBAR_WIDTH = '12rem';
+export const SIDEBAR_WIDTH = '188px';

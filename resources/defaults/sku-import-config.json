@@ -1,0 +1,14 @@
+{
+  "brands": [
+    { "name": "wkau", "code": "39", "shortName": "W", "enabled": true },
+    { "name": "lovi", "code": "42", "shortName": "L", "enabled": true },
+    { "name": "nimi", "code": "51", "shortName": "N", "enabled": true }
+  ],
+  "accessories": [
+    { "name": "补色膏", "skuCode": "YP-BSG01", "brand": "wkau", "enabled": true },
+    { "name": "固色剂", "skuCode": "GSJ02", "brand": "wkau", "enabled": true },
+    { "name": "护理液", "skuCode": "HLY03", "brand": "lovi", "enabled": true },
+    { "name": "自粘袋", "skuCode": "PJ-ZND01", "brand": "", "enabled": true },
+    { "name": "说明书", "skuCode": "PJ-SHMS01", "brand": "", "enabled": true }
+  ]
+}
