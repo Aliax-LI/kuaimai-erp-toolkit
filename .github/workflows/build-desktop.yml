@@ -73,7 +73,7 @@ jobs:
           if-no-files-found: error
 
   build-macos:
-    name: macOS (DMG)
+    name: macOS arm64 (DMG)
     needs: test
     runs-on: macos-latest
     timeout-minutes: 45
