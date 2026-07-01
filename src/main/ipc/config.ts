@@ -1,7 +1,8 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '@shared/ipc-channels';
 import type { AppSettings, SecretsRecord } from '@shared/schemas/store';
+import type { ErpConnectionTestInput } from '@shared/types/erp-connection';
 
 import {
   getAppSettings,
@@ -9,6 +10,7 @@ import {
   setAppSettings,
   setSecrets,
 } from '../services/store';
+import { testErpConnection } from '../services/erp-connection';
 import { wrapIpcHandler } from './wrap-ipc-handler';
 
 export function registerConfigIpc(): void {
@@ -33,6 +35,14 @@ export function registerConfigIpc(): void {
     IPC_CHANNELS.CONFIG_SET_SECRETS,
     wrapIpcHandler(IPC_CHANNELS.CONFIG_SET_SECRETS, (_event, partial: SecretsRecord) =>
       setSecrets(partial),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.CONFIG_TEST_ERP_CONNECTION,
+    wrapIpcHandler(
+      IPC_CHANNELS.CONFIG_TEST_ERP_CONNECTION,
+      (_event, input: ErpConnectionTestInput = {}) => testErpConnection(input),
     ),
   );
 }

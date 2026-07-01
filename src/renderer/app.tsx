@@ -1,14 +1,14 @@
 import { HashRouter } from 'react-router-dom';
 
-import { ThemeProvider } from '@/hooks/use-theme';
+import { ToastProvider } from '@/hooks/use-toast';
 import { AppRoutes } from '@/routes';
 
 export function App() {
   return (
-    <ThemeProvider>
+    <ToastProvider>
       <HashRouter>
         <AppRoutes />
       </HashRouter>
-    </ThemeProvider>
+    </ToastProvider>
   );
 }

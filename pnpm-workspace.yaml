@@ -1,0 +1,11 @@
+packages:
+  - .
+
+nodeLinker: hoisted
+blockExoticSubdeps: false
+
+allowBuilds:
+  electron: true
+  esbuild: true
+  electron-winstaller: true
+  sharp: true

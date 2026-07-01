@@ -3,10 +3,20 @@ export const IPC_CHANNELS = {
   CONFIG_SET_APP: 'config:set-app',
   CONFIG_GET_SECRETS_META: 'config:get-secrets-meta',
   CONFIG_SET_SECRETS: 'config:set-secrets',
+  CONFIG_TEST_ERP_CONNECTION: 'config:test-erp-connection',
   UPLOAD_PICK_FILE: 'upload:pick-file',
   UPLOAD_ERP_OSS: 'upload:erp-oss',
   AUTH_ERP_LOGIN: 'auth:erp-login',
   DEBUG_LOG: 'debug:log',
+  SKU_IMPORT_PICK_FILE: 'sku-import:pick-file',
+  SKU_IMPORT_PREVIEW: 'sku-import:preview',
+  SKU_IMPORT_LIST_TASKS: 'sku-import:list-tasks',
+  SKU_IMPORT_GET_TASK: 'sku-import:get-task',
+  SKU_IMPORT_DELETE_TASK: 'sku-import:delete-task',
+  SKU_IMPORT_CLEAR_ALL_TASKS: 'sku-import:clear-all-tasks',
+  SKU_IMPORT_EXECUTE: 'sku-import:execute',
+  SKU_IMPORT_CONFIG_GET: 'sku-import:config-get',
+  SKU_IMPORT_CONFIG_SET: 'sku-import:config-set',
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

@@ -1,8 +1,10 @@
+import path from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
 
 import { registerAllIpcHandlers } from './ipc';
 import { getLogDir, initLogger, logger } from './services/logger';
+import { initSkuImportJobs } from './services/sku-import';
 import { ensureUserDataDirs } from './services/store';
 import { createMainWindow } from './windows/main-window';
 
@@ -12,6 +14,7 @@ if (started) {
 
 app.whenReady().then(() => {
   ensureUserDataDirs();
+  initSkuImportJobs(path.join(app.getPath('userData'), 'jobs', 'sku-import'));
   initLogger();
   registerAllIpcHandlers();
 

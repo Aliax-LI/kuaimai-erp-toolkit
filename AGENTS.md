@@ -1,6 +1,6 @@
 # 快麦 ERP 桌面小工具
 
-> 定义 **技术框架、目录、UI 布局、数据存储、配置** 五类规范。业务细节见各工具 PRD。
+> 定义 **技术框架、目录、UI 布局、数据存储、配置** 五类规范。业务细节见各工具 PRD 与 `docs/superpowers/specs/`。
 
 ---
 
@@ -20,19 +20,21 @@ Renderer（React）→ preload（contextBridge）→ Main（Node）→ Core / To
 
 | 类别 | 选型 |
 |---|---|
-| 桌面 | Electron 28+、Electron Forge（Vite 模板） |
+| 桌面 | Electron 34+、Electron Forge（Vite 模板） |
 | 前端 | React 19、TypeScript 5 |
-| 样式 | Tailwind CSS 4、shadcn/ui、lucide-react |
+| 样式 | Tailwind CSS 4、framer-motion、lucide-react、Noto Sans SC |
 | 校验 | Zod |
-| 持久化 | electron-store |
+| 持久化 | `store.json`（`main/services/store.ts`，敏感字段 AES 加密） |
 | 测试 | Vitest |
-| 包管理 | npm |
+| 包管理 | **pnpm**（Node 22，见 `.nvmrc`） |
 
 ### 命令
 
 ```bash
-npm install && npm start    # 开发
-npm run typecheck && npm run test && npm run package
+pnpm install && pnpm start          # 开发
+pnpm run typecheck && pnpm run test # 校验
+pnpm run package                    # 本地打包（未做安装包）
+pnpm run make                       # 生成本机平台安装包
 ```
 
 ---
@@ -42,7 +44,8 @@ npm run typecheck && npm run test && npm run package
 ```
 kuaimai-erp-toolkit/
 ├── forge.config.ts、electron.vite.config.ts、package.json、tsconfig.json
-├── resources/、docs/、scripts/、tests/
+├── resources/           # 应用图标（icon.svg → premake 生成 ico/icns/png）
+├── docs/、scripts/、tests/
 └── src/
     ├── main/          index.ts、ipc/、services/、windows/
     ├── preload/       index.ts、api.d.ts、apis/
@@ -56,7 +59,7 @@ kuaimai-erp-toolkit/
 |---|---|
 | 文件名 | kebab-case |
 | 组件 | PascalCase |
-| 工具 ID | kebab-case |
+| 工具 ID | kebab-case（如 `sku-import`） |
 | IPC channel | `domain:action`，定义于 `shared/ipc-channels.ts` |
 | 新增工具 | 扩展 `tools/`、`renderer/tools/`、`main/ipc/tools/`、`preload/apis/`，不复制整套 main/preload |
 
@@ -75,11 +78,11 @@ Renderer  →  window.kuaimai.*  →  preload/apis/  →  main/ipc/  →  main/s
 | 桥接 | `preload/apis/<domain>.ts` | `ipcRenderer.invoke` 封装 |
 | 暴露 | `preload/index.ts` | 唯一 `contextBridge.exposeInMainWorld('kuaimai', …)` |
 
-新增能力按域拆分（如 `upload`）：先 `shared` 定 channel 与类型 → `core` 写逻辑 → `main/services` + `main/ipc` → `preload/apis` 注册 → `build-api.ts` 汇总。渲染进程只调 `window.kuaimai`，禁止直接 fs/网络/读 secrets。
+新增能力按域拆分：先 `shared` 定 channel 与类型 → `core` / `tools` 写逻辑 → `main/services` + `main/ipc` → `preload/apis` → `build-api.ts` 汇总。渲染进程只调 `window.kuaimai`，禁止直接 fs/网络/读 secrets。
 
-**示例（文件上传）**：`core/erp-oss-uploader.ts` → `main/services/upload.ts` → `main/ipc/upload.ts` → `preload/apis/upload.ts`。
+**示例（建货号）**：`tools/sku-import/*` → `main/services/sku-import.ts` → `main/ipc/tools/sku-import.ts` → `preload/apis/sku-import.ts`。
 
-**示例（账号登录）**：`core/erp-login.ts` → `main/services/auth.ts` → `main/ipc/auth.ts` → `preload/apis/auth.ts`。
+**示例（OSS 上传）**：`core/erp-oss-uploader.ts` → `main/services/upload.ts` → `main/ipc/upload.ts` → `preload/apis/upload.ts`。
 
 ---
 
@@ -87,86 +90,85 @@ Renderer  →  window.kuaimai.*  →  preload/apis/  →  main/ipc/  →  main/s
 
 ### 设计体系
 
-- 组件：shadcn/ui；图标：lucide-react；字体：系统 UI 栈。
-- 默认 **暗色主题**，支持亮/暗切换（主区顶栏右侧日/月图标）。
+- 组件：自定义 primitives + `components/shared/`（从 my-app 暖色 UI 反推）；图标：lucide-react；字体：**Noto Sans SC**。
+- **仅浅色暖色主题**（cream / amber / charcoal）；无暗色切换。
 - **无登录页**：启动直达工作台；侧栏无用户头像、登录/退出。
 
-### 应用骨架（强制：侧栏 + 主区）
-
-全应用共用 **左侧导航 + 右侧主区** 双层结构；主区内部布局由 **各页面自行组合**，不强制三栏或固定参数栏。
+### 应用骨架（强制：顶栏 + 侧栏 + 主区）
 
 ```
-┌──────────┬──────────────────────────────────────────────┐
-│ Logo     │  页面标题        [页面操作] [设置] [主题]      │  PageHeader
-│ 应用名   ├──────────────────────────────────────────────┤
-│ 副标题   │                                              │
-│          │           PageContent（页面自定义）            │
-│ ● 导航项 │   单栏 / 左右分栏 / 卡片堆叠，由页面决定       │
-│   …      │                                              │
-│          │                                              │
-└──────────┴──────────────────────────────────────────────┘
-  Sidebar                 Main（flex-1，内部滚动）
-  固定宽度
+┌─────────────────────────────────────────────────────────────┐
+│ Logo + 标题                              [连接状态 · 只读]   │  Header h-14
+├──────────┬──────────────────────────────────────────────────┤
+│ ● 工作台 │                                                  │
+│ ● 历史记录│           PageContent（max-w-6xl 居中）            │
+│ ● 配置管理│                                                  │
+│ v2.0     │                                                  │
+└──────────┴──────────────────────────────────────────────────┘
+  Sidebar（188px）          Main（flex-1，overflow-y-auto）
 ```
 
 | 层级 | 规范 |
 |---|---|
-| **Sidebar** | 始终可见；上：品牌区；中：导航列表（仅业务页） |
-| **Main** | 占满剩余宽度；含 `PageHeader` + `PageContent` |
-| **PageHeader** | 左：当前页标题；右：**设置**（齿轮图标）+ 主题切换 + 本页操作按钮；设置固定最右或紧邻主题切换 |
-| **PageContent** | 页面自由布局，常用模式见下表 |
+| **Header** | 全宽顶栏；左：Logo + 应用标题；右：**ERP 连接状态胶囊**（只读，点击跳转配置管理 ERP Tab） |
+| **Sidebar** | 188px；**工作台 / 历史记录 / 配置管理** 三项导航；底：版本文案 |
+| **Main** | `p-6`；内容 `max-w-6xl mx-auto` |
 
-**PageContent 常用模式**（按需选用，非全局强制）：
+**PageContent 常用模式**：
 
 | 模式 | 结构 | 适用 |
 |---|---|---|
-| 单栏 | 纵向卡片区块 | 设置、列表、表单 |
-| 主 + 侧栏 | 内容区 + 右侧可折叠 Panel | 参数、预览、详情 |
-| 主 + 底栏 | 内容区 + 底部固定操作条 | 批量任务、进度与主按钮 |
+| 三步手风琴 | StepIndicator + AccordionStep × 3 | 工作台 |
+| 表格列表 | 搜索 + DataTable | 历史记录 |
+| Tab 配置 | Segmented Tab + 表单/表格 | 配置管理 |
 
-- 最小窗口建议 `1024 × 640`；窄屏时 Sidebar 可收窄为图标模式，**不得完全隐藏**。
-- 禁止用顶栏 Tab 替代侧栏导航。
+- 最小窗口 **1024 × 640**；侧栏始终可见，不得完全隐藏。
 
-### 导航与设置（强制项）
+### 导航与路由（强制项）
 
-| 入口 | 位置 | 说明 |
+| 路由 | 侧栏 | 说明 |
 |---|---|---|
-| 业务导航 | 侧栏 | 工作台等业务页；图标 + 文案，激活态浅灰底 |
-| **设置** | **PageHeader 右上角** | 齿轮图标按钮，跳转 `/settings`；**不放侧栏** |
-| `/workbench` | 侧栏 | 默认落地页 |
-| `/settings` | 顶栏入口 | 独立页面，非 Dialog |
+| `/workbench` | 工作台 | 3 步：导入 Excel → 批量创建 → 创建结果；导入后自动预演 |
+| `/history` | 历史记录 | 任务历史表格；「查看」跳转工作台 |
+| `/config` | 配置管理 | `?tab=erp\|brands\|…`；ERP Tab 可保存凭证 |
+| `/tasks` | — | 重定向 `/history` |
+| `/settings` | — | 重定向 `/config?tab=erp` |
+| `/tools/sku-import` | — | 重定向 `/workbench` |
 
-### 设置页
+### 配置管理
 
-- 路由 `/settings`；进入后 PageHeader 标题为「设置」，右上角入口可显示为激活态。
-- 无登录页；侧栏无用户头像、登录/退出；敏感项掩码输入，保存后不回显明文。
+- **ERP 连接**（`?tab=erp`）：Cookie、companyId、`erpBaseUrl`；敏感项加密，界面不回显明文。
+- **品牌/配件/编码规则/分类**：首期 UI 外壳（mock / 只读）。
+- 桌面应用运行时 **不读** 根目录 `.env`；CLI 脚本仍可用 `.env`。
 
-### 视觉
+### 视觉（暖色参考）
 
-| 项 | 暗色参考 |
+| 项 | 参考 |
 |---|---|
-| 页面底 | `#0a0a0a` ~ `#111` |
-| 侧栏 | 略深于主区 |
-| 卡片 | `#141414` ~ `#1a1a1a`，细边框，圆角 8–12px |
-| 文字 | 主 `#f5f5f5`，次 `#a3a3a3` |
-| 主按钮 | 高对比填充 + 白字 + 图标 |
-
-输入框深底细边框；开关用胶囊 Toggle；卡片轻边框无厚重阴影。
+| 页面底 | `#FBF7EF`（cream） |
+| 侧栏 | `#F7EFE1`（cream-warm） |
+| 卡片 | `#FDFBF5`（cream-white），边框 `#E9DCCF`（beige） |
+| 文字 | 主 `#1D1D1D`（charcoal），次 `#A18D7C`（brown-soft） |
+| 主按钮 | `#FF825B`（amber）填充 + 白字 |
 
 ### 布局组件目录
 
 ```
 renderer/components/layout/
-├── AppShell.tsx       # Sidebar + Main 容器
-├── sidebar/           # Sidebar、SidebarBrand、SidebarNav、SidebarNavItem
-├── page-header/       # 页面顶栏（含设置、主题切换）
-├── page-content/      # 主区滚动容器
-└── panel/             # 可选右侧/底部 Panel（页面级引用）
+├── app-layout.tsx
+├── header.tsx
+└── sidebar.tsx
+
+renderer/components/shared/
+├── step-indicator.tsx
+├── accordion-step.tsx
+├── drag-drop-zone.tsx
+└── …
 
 renderer/pages/
 ├── workbench.tsx
-├── settings.tsx       # 强制
-└── …
+├── history.tsx
+└── config.tsx
 ```
 
 ---
@@ -177,22 +179,18 @@ renderer/pages/
 
 ```
 userData/
-├── store.json           # 全局配置（敏感字段加密）
-├── config/<tool-id>/    # 工具业务配置 JSON
-├── jobs/                # 任务快照
-├── logs/                # JSONL，按日滚动
-└── cache/               # 临时文件，可清理
+├── store.json                    # 全局配置（敏感字段加密）
+├── jobs/sku-import/<uuid>.json   # 建货号任务快照
+├── config/<tool-id>/             # 工具业务配置 JSON
+├── logs/                         # JSONL，按日滚动
+└── cache/                        # 临时文件，可清理
 ```
 
 | 分类 | 格式 | 说明 |
 |---|---|---|
-| 全局 / 敏感 | `store.json` | 敏感项 AES 加密；日志脱敏 |
-| 工具配置 | JSON + `schemaVersion` | 原子写（临时文件 + rename） |
+| 全局 / 敏感 | `store.json` | `app` + `secrets`（加密）；日志脱敏 |
+| 工具任务 | JSON + `schemaVersion` | 原子写（临时文件 + rename） |
 | 用户导出 | 用户自选路径 | 不由应用目录管理 |
-
-```json
-{ "schemaVersion": 1, "updatedAt": "…", "data": {} }
-```
 
 ---
 
@@ -202,26 +200,29 @@ userData/
 |---|---|---|
 | 构建 | `forge.config.ts`、`electron.vite.config.ts` | 改源码 |
 | 应用元数据 | `package.json` | 改源码 |
-| 运行时全局 | `store.json` → `app` | 设置页 / IPC |
-| 敏感项 | `store.json` → `secrets`（加密） | 设置页 / IPC |
-| 工具业务 | `config/<tool-id>/` | 设置或工具配置页 |
-| 开发环境 | `.env`（仅 `scripts/`） | 不入库、不进运行时 |
+| 运行时全局 | `store.json` → `app` | 设置页 / IPC（含 `erpBaseUrl`） |
+| 敏感项 | `store.json` → `secrets` | 设置页 / IPC（`erpCookie`、`erpCompanyId`） |
+| 工具业务 | `config/<tool-id>/`、`jobs/` | 工具 IPC |
+| 开发脚本 | 根目录 `.env` | **仅 CLI**；不入库、不进 Electron 运行时 |
 
 ```ts
-interface AppStore {
-  app: {
-    theme: 'light' | 'dark' | 'system';
-    locale: 'zh-CN';
-    // 其他全局项由工具 PRD 扩展
-  };
-  secrets: {
-    // 加密存储，界面不回显明文
-  };
+interface AppSettings {
+  theme: 'light' | 'dark' | 'system';
+  locale: 'zh-CN';
+  erpBaseUrl: string; // 默认 https://erp.superboss.cc
 }
 ```
 
-- 读写统一经 `main/services/store.ts`；渲染进程仅 IPC。
-- `app` 与 `secrets` 分离；schema 定义于 `shared/schemas/`，启动校验，损坏回退默认并 `.bak` 备份。
-- IPC 配置前缀 `config:`；preload 暴露 `kuaimai.config.*`，不暴露文件路径。
+- 读写统一经 `main/services/store.ts`；ERP 请求配置见 `main/services/erp-web.ts`（`getErpWebConfig`）。
+- schema 定义于 `shared/schemas/store.ts`，损坏回退默认并 `.bak` 备份。
+
+---
+
+## 6. 打包与图标
+
+- 图标源文件：`resources/icon.svg`；`pnpm run icons:generate` 或 `premake` 生成 png/ico/icns。
+- `forge.config.ts`：`packagerConfig.icon` + 各 Maker 图标（Squirrel / DMG / deb / rpm）。
+- 平台建议：**Linux deb** 本机可打；**Windows Setup.exe** 建议 Windows CI；**macOS dmg** 必须 macOS CI。
+- 产物目录：`out/make/`。
 
 ---
