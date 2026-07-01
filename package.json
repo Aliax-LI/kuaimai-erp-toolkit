@@ -3,6 +3,10 @@
   "productName": "快麦 ERP 工具箱",
   "version": "0.1.0",
   "private": true,
+  "author": {
+    "name": "Kuaimai",
+    "email": "dev@kuaimai.com"
+  },
   "engines": {
     "node": ">=22 <24"
   },

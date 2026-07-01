@@ -27,6 +27,8 @@ const config: ForgeConfig = {
     // Windows：Squirrel 安装包（Setup.exe，含桌面快捷方式图标）
     new MakerSquirrel({
       name: 'KuaimaiErpToolkit',
+      authors: 'Kuaimai',
+      description: '快麦 ERP 桌面小工具集合',
       setupIcon: `${iconBase}.ico`,
     }),
     // Windows 便携版 zip（Linux CI 无需 Wine 也可产出）
