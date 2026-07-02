@@ -10,6 +10,12 @@ import { fileURLToPath } from 'node:url';
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const electronDir = path.join(rootDir, 'node_modules', 'electron');
 const pathFile = path.join(electronDir, 'path.txt');
+const electronWinstallerVendorDir = path.join(
+  rootDir,
+  'node_modules',
+  'electron-winstaller',
+  'vendor',
+);
 
 function getPlatformPath() {
   switch (process.platform) {
@@ -53,3 +59,25 @@ if (needsInstall) {
 if (!fs.existsSync(pathFile) && fs.existsSync(electronBinary)) {
   fs.writeFileSync(pathFile, platformPath);
 }
+
+function ensureElectronWinstaller7Zip() {
+  if (!fs.existsSync(electronWinstallerVendorDir)) {
+    return;
+  }
+
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  const files = [
+    [`7z-${arch}.exe`, '7z.exe'],
+    [`7z-${arch}.dll`, '7z.dll'],
+  ];
+
+  for (const [sourceName, targetName] of files) {
+    const source = path.join(electronWinstallerVendorDir, sourceName);
+    const target = path.join(electronWinstallerVendorDir, targetName);
+    if (fs.existsSync(source) && !fs.existsSync(target)) {
+      fs.copyFileSync(source, target);
+    }
+  }
+}
+
+ensureElectronWinstaller7Zip();

@@ -9,3 +9,6 @@ allowBuilds:
   esbuild: true
   electron-winstaller: true
   sharp: true
+
+patchedDependencies:
+  '@electron/packager@18.4.4': patches/@electron__packager@18.4.4.patch
