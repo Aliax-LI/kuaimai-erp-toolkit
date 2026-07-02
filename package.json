@@ -15,62 +15,106 @@
   "main": ".vite/build/index.js",
   "scripts": {
     "postinstall": "node scripts/ensure-electron.mjs",
-    "start": "electron-forge start",
-    "package": "electron-forge package",
+    "start": "node scripts/build-app.mjs && electron .",
+    "build": "node scripts/build-app.mjs",
+    "build:main": "vite build --config vite.main.config.ts",
+    "build:preload": "vite build --config vite.preload.config.ts",
+    "build:renderer": "vite build --config vite.renderer.config.ts",
+    "package": "node scripts/build-app.mjs && electron-builder --dir",
     "premake": "node scripts/generate-app-icons.mjs",
-    "make": "electron-forge make",
-    "make:linux": "electron-forge make --platform=linux --arch=x64 --targets=@electron-forge/maker-deb",
-    "make:win": "electron-forge make --platform=win32 --arch=x64",
-    "make:mac": "electron-forge make --platform=darwin --arch=arm64",
-    "make:mac:universal": "electron-forge make --platform=darwin --arch=universal",
-    "make:mac:x64": "electron-forge make --platform=darwin --arch=x64",
+    "make": "node scripts/build-app.mjs && electron-builder --publish never",
+    "make:linux": "node scripts/build-app.mjs && electron-builder --linux deb rpm --x64 --publish never",
+    "make:win": "node scripts/build-app.mjs && electron-builder --win nsis --x64 --publish never",
+    "make:mac": "node scripts/build-app.mjs && electron-builder --mac dmg zip --arm64 --publish never",
+    "make:mac:universal": "node scripts/build-app.mjs && electron-builder --mac dmg zip --universal --publish never",
+    "make:mac:x64": "node scripts/build-app.mjs && electron-builder --mac dmg zip --x64 --publish never",
     "icons:generate": "node scripts/generate-app-icons.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "verify:oss": "tsx scripts/verify-oss-upload.ts",
     "smoke:sku": "tsx scripts/run-sku-smoke.mjs"
   },
-  "dependencies": {
-    "@fontsource/noto-sans-sc": "^5.2.9",
-    "ali-oss": "^6.22.0",
-    "clsx": "^2.1.1",
-    "dotenv": "^16.4.7",
-    "electron-squirrel-startup": "^1.0.1",
-    "fast-xml-parser": "^5.9.3",
-    "framer-motion": "^12.42.0",
-    "jszip": "^3.10.1",
-    "lucide-react": "^0.475.0",
-    "proxy-agent": "^5.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-router-dom": "^7.2.0",
-    "tailwind-merge": "^3.0.1",
-    "zod": "^3.24.2"
-  },
   "devDependencies": {
-    "@electron-forge/cli": "^7.8.0",
-    "@electron-forge/maker-deb": "^7.8.0",
-    "@electron-forge/maker-dmg": "^7.8.0",
-    "@electron-forge/maker-rpm": "^7.8.0",
-    "@electron-forge/maker-squirrel": "^7.8.0",
-    "@electron-forge/maker-zip": "^7.8.0",
-    "@electron-forge/plugin-fuses": "^7.8.0",
-    "@electron-forge/plugin-vite": "^7.8.0",
-    "@electron-forge/shared-types": "^7.8.0",
-    "@electron/fuses": "^1.8.0",
+    "@fontsource/noto-sans-sc": "^5.2.9",
     "@tailwindcss/vite": "^4.0.9",
     "@types/node": "^22.13.10",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
+    "ali-oss": "^6.22.0",
+    "clsx": "^2.1.1",
+    "dotenv": "^16.4.7",
     "electron": "^34.2.0",
+    "electron-builder": "26.0.12",
+    "fast-xml-parser": "^5.9.3",
+    "framer-motion": "^12.42.0",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.475.0",
     "png-to-ico": "^2.1.8",
     "png2icons": "^2.0.1",
+    "proxy-agent": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.2.0",
     "sharp": "^0.33.5",
+    "tailwind-merge": "^3.0.1",
     "tailwindcss": "^4.0.9",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "vite": "^6.2.0",
-    "vitest": "^3.0.7"
+    "vitest": "^3.0.7",
+    "zod": "^3.24.2"
+  },
+  "build": {
+    "appId": "com.kuaimai.erp-toolkit",
+    "productName": "快麦 ERP 工具箱",
+    "publish": null,
+    "directories": {
+      "output": "out/make",
+      "buildResources": "resources"
+    },
+    "files": [
+      ".vite/build/**/*",
+      ".vite/renderer/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": ".vite/build/index.js"
+    },
+    "asar": true,
+    "npmRebuild": false,
+    "buildDependenciesFromSource": false,
+    "icon": "resources/icon.png",
+    "mac": {
+      "icon": "resources/icon.icns",
+      "category": "public.app-category.business",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "dmg": {
+      "writeUpdateInfo": false
+    },
+    "win": {
+      "icon": "resources/icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "icon": "resources/icon.png",
+      "category": "Utility",
+      "target": [
+        "deb",
+        "rpm"
+      ]
+    }
   }
 }

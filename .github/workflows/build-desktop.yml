@@ -126,30 +126,6 @@ jobs:
             echo "MACOS_NOTARIZE=false" >> "$GITHUB_ENV"
           fi
 
-      - name: Rebuild DMG native dependency
-        run: |
-          pnpm rebuild --pending
-          pnpm rebuild fs-xattr macos-alias
-
-          XATTR_NODE="$(find node_modules -path '*/fs-xattr/build/Release/xattr.node' -print -quit)"
-          if [ -z "$XATTR_NODE" ]; then
-            echo "Missing fs-xattr native module"
-            pnpm why fs-xattr || true
-            find node_modules -path '*/fs-xattr/package.json' -print || true
-            exit 1
-          fi
-
-          ALIAS_NODE="$(find node_modules -path '*/macos-alias/build/Release/volume.node' -print -quit)"
-          if [ -z "$ALIAS_NODE" ]; then
-            echo "Missing macos-alias native module"
-            pnpm why macos-alias || true
-            find node_modules -path '*/macos-alias/package.json' -print || true
-            exit 1
-          fi
-
-          echo "Found fs-xattr native module: $XATTR_NODE"
-          echo "Found macos-alias native module: $ALIAS_NODE"
-
       - name: Build macOS package
         run: pnpm run make:mac
         env:

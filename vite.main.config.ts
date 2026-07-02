@@ -24,6 +24,13 @@ export default defineConfig({
     mainFields: ['main', 'module', 'jsnext:main', 'jsnext'],
   },
   build: {
+    outDir: path.resolve(rootDir, '.vite/build'),
+    emptyOutDir: true,
+    lib: {
+      entry: path.resolve(rootDir, 'src/main/index.ts'),
+      formats: ['cjs'],
+      fileName: () => 'index.js',
+    },
     rollupOptions: {
       external,
     },

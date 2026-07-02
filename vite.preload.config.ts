@@ -12,11 +12,15 @@ export default defineConfig({
     },
   },
   build: {
+    outDir: path.resolve(rootDir, '.vite/build'),
+    emptyOutDir: false,
+    lib: {
+      entry: path.resolve(rootDir, 'src/preload/index.ts'),
+      formats: ['cjs'],
+      fileName: () => 'preload.js',
+    },
     rollupOptions: {
       external: ['electron'],
-      output: {
-        entryFileNames: 'preload.js',
-      },
     },
   },
 });

@@ -19,5 +19,3 @@ declare module 'ali-oss' {
     put(name: string, file: Buffer): Promise<PutResult>;
   }
 }
-
-declare module 'electron-squirrel-startup';

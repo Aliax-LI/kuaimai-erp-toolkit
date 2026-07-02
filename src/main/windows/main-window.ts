@@ -4,8 +4,8 @@ import { BrowserWindow } from 'electron';
 
 import { DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from '@shared/constants/app';
 
-declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
-declare const MAIN_WINDOW_VITE_NAME: string;
+const rendererDevServerUrl = process.env.ELECTRON_RENDERER_URL;
+const rendererEntry = path.join(__dirname, '../renderer/main_window/index.html');
 
 export function createMainWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
@@ -27,12 +27,10 @@ export function createMainWindow(): BrowserWindow {
     mainWindow.show();
   });
 
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+  if (rendererDevServerUrl) {
+    mainWindow.loadURL(rendererDevServerUrl);
   } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
+    mainWindow.loadFile(rendererEntry);
   }
 
   return mainWindow;
