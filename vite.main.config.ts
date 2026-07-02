@@ -6,11 +6,10 @@ import { defineConfig } from 'vite';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
-/** Node/Electron 内置模块 + 不宜打包的 native 依赖 */
+/** Node/Electron 内置模块 */
 const external = [
   'electron',
   'electron/main',
-  'ali-oss',
   ...builtinModules,
   ...builtinModules.map((m) => `node:${m}`),
 ];
