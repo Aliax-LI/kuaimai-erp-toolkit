@@ -1,6 +1,6 @@
 # 快麦 ERP 桌面小工具
 
-> 定义 **技术框架、目录、UI 布局、数据存储、配置** 五类规范。业务细节见各工具 PRD 与 `docs/superpowers/specs/`。
+> 定义 **技术框架、目录、UI 布局、数据存储、配置、打包** 六类规范。业务细节见各工具 PRD 与 `docs/superpowers/specs/`。
 
 ---
 
@@ -8,11 +8,13 @@
 
 ### 架构
 
-```
+```text
 Renderer（React）→ preload（contextBridge）→ Main（Node）→ Core / Tools（纯 TS）
 ```
 
-- 三进程：`main` / `preload` / `renderer` 分离编译（Vite + Forge）。
+- 三进程：`main` / `preload` / `renderer` 分离编译。
+- 构建：Vite 分别使用 `vite.main.config.ts`、`vite.preload.config.ts`、`vite.renderer.config.ts`。
+- 安装包：`electron-builder`，配置位于 `package.json` 的 `build` 字段。
 - 渲染进程：`contextIsolation: true`，`nodeIntegration: false`，`sandbox: true`。
 - 特权能力（文件、网络、存储）仅主进程；渲染进程经 preload 窄接口 IPC 访问。
 
@@ -20,8 +22,8 @@ Renderer（React）→ preload（contextBridge）→ Main（Node）→ Core / To
 
 | 类别 | 选型 |
 |---|---|
-| 桌面 | Electron 34+、Electron Forge（Vite 模板） |
-| 前端 | React 19、TypeScript 5 |
+| 桌面 | Electron 34+、electron-builder |
+| 前端 | React 19、TypeScript 5、Vite |
 | 样式 | Tailwind CSS 4、framer-motion、lucide-react、Noto Sans SC |
 | 校验 | Zod |
 | 持久化 | `store.json`（`main/services/store.ts`，敏感字段 AES 加密） |
@@ -31,28 +33,36 @@ Renderer（React）→ preload（contextBridge）→ Main（Node）→ Core / To
 ### 命令
 
 ```bash
-pnpm install && pnpm start          # 开发
-pnpm run typecheck && pnpm run test # 校验
-pnpm run package                    # 本地打包（未做安装包）
-pnpm run make                       # 生成本机平台安装包
+pnpm install
+pnpm start                    # 开发预览：先构建，再启动 Electron
+pnpm run typecheck
+pnpm run test
+pnpm run package              # 仅生成目录版应用，不生成安装包
+pnpm run make                 # 生成当前平台安装包
+pnpm run make:win             # Windows NSIS 安装包
+pnpm run make:mac             # macOS arm64 dmg + zip，必须在 macOS 上执行
+pnpm run make:mac:x64         # macOS x64 dmg + zip
+pnpm run make:mac:universal   # macOS universal dmg + zip
+pnpm run make:linux           # Linux deb + rpm
 ```
 
 ---
 
 ## 2. 目录规范
 
-```
+```text
 kuaimai-erp-toolkit/
-├── forge.config.ts、electron.vite.config.ts、package.json、tsconfig.json
-├── resources/           # 应用图标（icon.svg → premake 生成 ico/icns/png）
+├── package.json、pnpm-workspace.yaml、tsconfig.json
+├── vite.main.config.ts、vite.preload.config.ts、vite.renderer.config.ts
+├── resources/           # 应用图标（icon.svg → png / ico / icns）
 ├── docs/、scripts/、tests/
 └── src/
-    ├── main/          index.ts、ipc/、services/、windows/
-    ├── preload/       index.ts、api.d.ts、apis/
-    ├── renderer/      pages/、routes/、components/、hooks/、tools/<tool-id>/
-    ├── shared/        types/、constants/、schemas/、ipc-channels.ts
-    ├── core/          通用纯 TS
-    └── tools/<tool-id>/  单工具逻辑
+    ├── main/            index.ts、ipc/、services/、windows/
+    ├── preload/         index.ts、api.d.ts、apis/
+    ├── renderer/        pages/、routes/、components/、hooks/、tools/<tool-id>/
+    ├── shared/          types/、constants/、schemas/、ipc-channels.ts
+    ├── core/            通用纯 TS
+    └── tools/<tool-id>/ 工具业务逻辑
 ```
 
 | 规则 | 说明 |
@@ -65,7 +75,7 @@ kuaimai-erp-toolkit/
 
 ### 后端逻辑封装（IPC / API）
 
-```
+```text
 Renderer  →  window.kuaimai.*  →  preload/apis/  →  main/ipc/  →  main/services/  →  core/ | tools/
 ```
 
@@ -80,23 +90,19 @@ Renderer  →  window.kuaimai.*  →  preload/apis/  →  main/ipc/  →  main/s
 
 新增能力按域拆分：先 `shared` 定 channel 与类型 → `core` / `tools` 写逻辑 → `main/services` + `main/ipc` → `preload/apis` → `build-api.ts` 汇总。渲染进程只调 `window.kuaimai`，禁止直接 fs/网络/读 secrets。
 
-**示例（建货号）**：`tools/sku-import/*` → `main/services/sku-import.ts` → `main/ipc/tools/sku-import.ts` → `preload/apis/sku-import.ts`。
-
-**示例（OSS 上传）**：`core/erp-oss-uploader.ts` → `main/services/upload.ts` → `main/ipc/upload.ts` → `preload/apis/upload.ts`。
-
 ---
 
 ## 3. UI 布局规范
 
 ### 设计体系
 
-- 组件：自定义 primitives + `components/shared/`（从 my-app 暖色 UI 反推）；图标：lucide-react；字体：**Noto Sans SC**。
+- 组件：自定义 primitives + `components/shared/`；图标：lucide-react；字体：**Noto Sans SC**。
 - **仅浅色暖色主题**（cream / amber / charcoal）；无暗色切换。
 - **无登录页**：启动直达工作台；侧栏无用户头像、登录/退出。
 
 ### 应用骨架（强制：顶栏 + 侧栏 + 主区）
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │ Logo + 标题                              [连接状态 · 只读]   │  Header h-14
 ├──────────┬──────────────────────────────────────────────────┤
@@ -131,45 +137,9 @@ Renderer  →  window.kuaimai.*  →  preload/apis/  →  main/ipc/  →  main/s
 | `/workbench` | 工作台 | 3 步：导入 Excel → 批量创建 → 创建结果；导入后自动预演 |
 | `/history` | 历史记录 | 任务历史表格；「查看」跳转工作台 |
 | `/config` | 配置管理 | `?tab=erp\|brands\|…`；ERP Tab 可保存凭证 |
-| `/tasks` | — | 重定向 `/history` |
-| `/settings` | — | 重定向 `/config?tab=erp` |
-| `/tools/sku-import` | — | 重定向 `/workbench` |
-
-### 配置管理
-
-- **ERP 连接**（`?tab=erp`）：Cookie、companyId、`erpBaseUrl`；敏感项加密，界面不回显明文。
-- **品牌/配件/编码规则/分类**：首期 UI 外壳（mock / 只读）。
-- 桌面应用运行时 **不读** 根目录 `.env`；CLI 脚本仍可用 `.env`。
-
-### 视觉（暖色参考）
-
-| 项 | 参考 |
-|---|---|
-| 页面底 | `#FBF7EF`（cream） |
-| 侧栏 | `#F7EFE1`（cream-warm） |
-| 卡片 | `#FDFBF5`（cream-white），边框 `#E9DCCF`（beige） |
-| 文字 | 主 `#1D1D1D`（charcoal），次 `#A18D7C`（brown-soft） |
-| 主按钮 | `#FF825B`（amber）填充 + 白字 |
-
-### 布局组件目录
-
-```
-renderer/components/layout/
-├── app-layout.tsx
-├── header.tsx
-└── sidebar.tsx
-
-renderer/components/shared/
-├── step-indicator.tsx
-├── accordion-step.tsx
-├── drag-drop-zone.tsx
-└── …
-
-renderer/pages/
-├── workbench.tsx
-├── history.tsx
-└── config.tsx
-```
+| `/tasks` | - | 重定向 `/history` |
+| `/settings` | - | 重定向 `/config?tab=erp` |
+| `/tools/sku-import` | - | 重定向 `/workbench` |
 
 ---
 
@@ -177,7 +147,7 @@ renderer/pages/
 
 根路径：`app.getPath('userData')`，禁止写入安装目录或源码目录。
 
-```
+```text
 userData/
 ├── store.json                    # 全局配置（敏感字段加密）
 ├── jobs/sku-import/<uuid>.json   # 建货号任务快照
@@ -198,7 +168,7 @@ userData/
 
 | 层级 | 位置 | 修改方式 |
 |---|---|---|
-| 构建 | `forge.config.ts`、`electron.vite.config.ts` | 改源码 |
+| 构建 | `package.json` 的 `build` 字段、Vite 配置 | 改源码 |
 | 应用元数据 | `package.json` | 改源码 |
 | 运行时全局 | `store.json` → `app` | 设置页 / IPC（含 `erpBaseUrl`） |
 | 敏感项 | `store.json` → `secrets` | 设置页 / IPC（`erpCookie`、`erpCompanyId`） |
@@ -215,14 +185,21 @@ interface AppSettings {
 
 - 读写统一经 `main/services/store.ts`；ERP 请求配置见 `main/services/erp-web.ts`（`getErpWebConfig`）。
 - schema 定义于 `shared/schemas/store.ts`，损坏回退默认并 `.bak` 备份。
+- Electron 运行时不读根目录 `.env`；`.env` 只供 CLI / smoke 脚本使用。
 
 ---
 
 ## 6. 打包与图标
 
-- 图标源文件：`resources/icon.svg`；`pnpm run icons:generate` 或 `premake` 生成 png/ico/icns。
-- `forge.config.ts`：`packagerConfig.icon` + 各 Maker 图标（Squirrel / DMG / deb / rpm）。
-- 平台建议：**Linux deb** 本机可打；**Windows Setup.exe** 建议 Windows CI；**macOS dmg** 必须 macOS CI。
-- 产物目录：`out/make/`。
-
----
+- 图标源文件：`resources/icon.svg`。
+- `pnpm run icons:generate` 或 `scripts/build-app.mjs` 会生成 `resources/icon.png`、`resources/icon.ico`、`resources/icon.icns`。
+- `package.json` 的 `build` 字段是安装包唯一配置源。
+- 构建输出：
+  - `.vite/build/`：main / preload 产物。
+  - `.vite/renderer/main_window/`：renderer 产物。
+  - `out/make/`：`electron-builder` 打包产物。
+- 平台建议：
+  - **Windows NSIS**：Windows CI。
+  - **macOS dmg / zip**：macOS CI；对外分发建议配置 Developer ID 签名与 notarization。
+  - **Linux deb / rpm**：Linux CI。
+- 项目代码由 Vite 打包进产物。除非明确需要运行时动态加载包，否则不要把业务依赖移回 `dependencies`；新增动态运行时依赖时必须同步检查 `electron-builder` 的 `files` 配置。

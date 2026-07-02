@@ -1,83 +1,99 @@
 # 快麦 ERP 工具箱
 
-快麦 ERP 桌面小工具集合。当前内置 **建货号**：从 Excel 导入待创建货号记录，预演校验后批量创建贴纸与套装，并回写 Excel。
+快麦 ERP 工具箱是一个基于 Electron + React 的桌面小工具，首期聚焦「建货号 / SKU 导入」工作流：导入 Excel、预演数据、批量创建、查看任务历史，并在本机安全保存 ERP 连接配置。
 
-## 环境要求
+## 技术栈
 
-- Node.js **22**（推荐 [nvm](https://github.com/nvm-sh/nvm)，项目根目录有 `.nvmrc`）
-- **pnpm**（不要使用 npm / yarn）
+- Electron 34+
+- React 19 + TypeScript 5 + Vite
+- Tailwind CSS 4 + framer-motion + lucide-react
+- Vitest
+- pnpm 10（Node 22，见 `.nvmrc`）
+- electron-builder
 
-## 快速开始
+## 本地开发
 
 ```bash
-nvm use
 pnpm install
 pnpm start
 ```
 
-Linux 若 Electron 沙箱报错，可临时：
+常用校验：
 
 ```bash
-ELECTRON_DISABLE_SANDBOX=1 pnpm start
+pnpm run typecheck
+pnpm run test
+pnpm run build
 ```
 
-## 首次使用
+`pnpm start` 会先运行 `scripts/build-app.mjs`，分别构建 main、preload、renderer，然后启动 Electron。
 
-1. 侧栏进入 **设置**
-2. 填写 **ERP Cookie**、**companyId**（如 `140109`）、**ERP 地址**（默认 `https://erp.superboss.cc`）
-3. 侧栏 **工作台** → 选择 Excel（工作表「待创建货号记录」）→ **开始预演** → **执行**
-4. **任务列表** 查看每条任务的预演详情、执行结果与 D2 验证
-
-凭证保存在本机 `userData/store.json`（加密），桌面应用 **不读取** 项目根目录 `.env`。
-
-## 常用命令
-
-| 命令 | 说明 |
-|------|------|
-| `pnpm start` | 开发模式 |
-| `pnpm run typecheck` | TypeScript 检查 |
-| `pnpm run test` | 单元测试 |
-| `pnpm run package` | 打包应用（无安装包） |
-| `pnpm run make` | 生成本机平台安装包 |
-| `pnpm run icons:generate` | 从 `resources/icon.svg` 生成各平台图标 |
-| `pnpm run smoke:sku` | CLI 冒烟（需根目录 `.env` 配置 `ERP_COOKIE` 等） |
-
-### 分平台打包
+## 打包
 
 ```bash
-# Linux deb（Ubuntu 推荐）
-pnpm exec electron-forge make --platform=linux --arch=x64 --targets=@electron-forge/maker-deb
-
-# Windows（建议在 Windows CI；Linux 可尝试 zip，耗时长）
-pnpm run make:win
-
-# macOS（必须在 macOS 上执行）
-pnpm run make:mac
+pnpm run package              # 目录版应用，不生成安装器
+pnpm run make                 # 当前平台安装包
+pnpm run make:win             # Windows NSIS Setup.exe
+pnpm run make:mac             # macOS arm64 dmg + zip
+pnpm run make:mac:x64         # macOS x64 dmg + zip
+pnpm run make:mac:universal   # macOS universal dmg + zip
+pnpm run make:linux           # Linux deb + rpm
 ```
 
-产物输出在 `out/make/`。安装后桌面快捷方式使用项目 Logo（`resources/icon.*`）。
+输出目录：
+
+- `.vite/build/`：main / preload 构建产物。
+- `.vite/renderer/main_window/`：renderer 构建产物。
+- `out/make/`：`electron-builder` 安装包产物。
+
+平台限制：
+
+- macOS 安装包必须在 macOS 上构建。
+- Windows 安装包建议在 Windows CI 上构建。
+- 对外分发 macOS 应用时，建议配置 Apple Developer ID 签名与 notarization，否则用户仍可能遇到 Gatekeeper 安全拦截。
+
+## GitHub Actions
+
+桌面构建流水线位于 `.github/workflows/build-desktop.yml`：
+
+- `test`：安装依赖、类型检查、运行测试。
+- `build-windows`：生成 Windows NSIS 安装包。
+- `build-macos`：生成 macOS arm64 dmg + zip。
+- `release`：在 tag、`main` 或手动触发时发布预发布 / 正式 Release。
+
+流水线使用 `pnpm/action-setup@v4`，pnpm 版本由 `package.json` 的 `packageManager` 字段统一指定，避免 GitHub Action 与项目声明版本不一致。
+
+macOS 签名相关 secrets（可选）：
+
+- `MACOS_CERTIFICATE_BASE64`
+- `MACOS_CERTIFICATE_PASSWORD`
+- `MACOS_CODESIGN_IDENTITY`
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+- `APPLE_TEAM_ID`
+
+未配置证书时，CI 仍会构建未签名产物；未签名产物只适合内部测试。
 
 ## 项目结构
 
-```
+```text
 src/
-├── main/       Electron 主进程、IPC、服务
-├── preload/    contextBridge API
-├── renderer/   React UI（工作台 / 任务列表 / 设置）
-├── shared/     类型、IPC 通道、Schema
-├── core/       通用 ERP 客户端、OSS 等
-└── tools/      业务工具逻辑（如 sku-import）
+├── main/            Electron 主进程、IPC 注册、服务层
+├── preload/         contextBridge 与渲染进程 API
+├── renderer/        React 页面、布局、组件、工具 UI
+├── shared/          IPC channel、类型、常量、schema
+├── core/            无 Electron 依赖的通用逻辑
+└── tools/           各业务工具的纯 TS 逻辑
 ```
 
-架构与规范详见 [AGENTS.md](./AGENTS.md)。
+运行时数据统一写入 `app.getPath('userData')`，不要写入安装目录或源码目录。根目录 `.env` 只供 CLI / smoke 脚本使用，不进入 Electron 运行时。
 
-## 开发说明
+## 图标
 
-- 包管理：**pnpm** + `pnpm-workspace.yaml`
-- 路由：`/workbench`、`/tasks`、`/settings`
-- 任务落盘：`userData/jobs/sku-import/<uuid>.json`
-- 设计文档：`docs/superpowers/specs/`、`docs/superpowers/plans/`
+图标源文件为 `resources/icon.svg`。
 
-## 许可证
+```bash
+pnpm run icons:generate
+```
 
-私有项目（`package.json` → `"private": true`）。
+该命令会生成 `resources/icon.png`、`resources/icon.ico`、`resources/icon.icns`。打包脚本也会在构建前自动执行图标生成。
