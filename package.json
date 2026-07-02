@@ -3,6 +3,7 @@
   "productName": "快麦 ERP 工具箱",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.11.0",
   "author": {
     "name": "Kuaimai",
     "email": "dev@kuaimai.com"
@@ -39,6 +40,7 @@
     "framer-motion": "^12.42.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.475.0",
+    "proxy-agent": "^5.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.2.0",
