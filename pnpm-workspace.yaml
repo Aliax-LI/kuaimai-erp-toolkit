@@ -11,5 +11,12 @@ allowBuilds:
   macos-alias: true
   sharp: true
 
+onlyBuiltDependencies:
+  - electron
+  - esbuild
+  - electron-winstaller
+  - macos-alias
+  - sharp
+
 patchedDependencies:
   '@electron/packager@18.4.4': patches/@electron__packager@18.4.4.patch
