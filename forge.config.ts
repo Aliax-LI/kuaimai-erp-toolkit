@@ -13,6 +13,13 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const iconBase = path.join(rootDir, 'resources', 'icon');
+const shouldSignMac = process.platform === 'darwin' && process.env.MACOS_SIGN === 'true';
+const shouldNotarizeMac =
+  shouldSignMac &&
+  process.env.MACOS_NOTARIZE === 'true' &&
+  Boolean(process.env.APPLE_ID) &&
+  Boolean(process.env.APPLE_APP_SPECIFIC_PASSWORD) &&
+  Boolean(process.env.APPLE_TEAM_ID);
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -21,6 +28,24 @@ const config: ForgeConfig = {
     executableName: 'kuaimai-erp-toolkit',
     appBundleId: 'com.kuaimai.erp-toolkit',
     icon: iconBase,
+    ...(shouldSignMac
+      ? {
+          osxSign: process.env.MACOS_CODESIGN_IDENTITY
+            ? {
+                identity: process.env.MACOS_CODESIGN_IDENTITY,
+              }
+            : {},
+        }
+      : {}),
+    ...(shouldNotarizeMac
+      ? {
+          osxNotarize: {
+            appleId: process.env.APPLE_ID!,
+            appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD!,
+            teamId: process.env.APPLE_TEAM_ID!,
+          },
+        }
+      : {}),
   },
   rebuildConfig: {},
   makers: [
