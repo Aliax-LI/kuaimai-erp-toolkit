@@ -89,6 +89,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Rebuild DMG native dependency
+        run: |
+          pnpm rebuild macos-alias
+          test -f node_modules/macos-alias/build/Release/volume.node
+
       - name: Build macOS package
         run: pnpm run make:mac
         env:
