@@ -15,13 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -42,13 +42,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -65,7 +65,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-${{ github.sha }}
-          path: out/make/**
+          path: |
+            out/make/*.exe
+            out/make/*.blockmap
           if-no-files-found: error
 
   build-macos:
@@ -75,13 +77,13 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -135,7 +137,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-${{ github.sha }}
-          path: out/make/**
+          path: |
+            out/make/*.dmg
+            out/make/*.zip
+            out/make/*.blockmap
           if-no-files-found: error
 
   release:
@@ -150,7 +155,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Resolve release metadata
         id: meta
@@ -194,5 +199,9 @@ jobs:
           name: ${{ steps.meta.outputs.name }}
           prerelease: ${{ steps.meta.outputs.prerelease }}
           files: |
-            dist/**/*
+            dist/windows/**/*.exe
+            dist/windows/**/*.blockmap
+            dist/macos/**/*.dmg
+            dist/macos/**/*.zip
+            dist/macos/**/*.blockmap
           generate_release_notes: true

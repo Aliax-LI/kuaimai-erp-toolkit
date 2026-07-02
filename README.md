@@ -61,7 +61,7 @@ pnpm run make:linux           # Linux deb + rpm
 - `build-macos`：生成 macOS arm64 dmg + zip。
 - `release`：在 tag、`main` 或手动触发时发布预发布 / 正式 Release。
 
-流水线使用 `pnpm/action-setup@v4`，pnpm 版本由 `package.json` 的 `packageManager` 字段统一指定，避免 GitHub Action 与项目声明版本不一致。
+流水线使用 `pnpm/action-setup@v6`，pnpm 版本由 `package.json` 的 `packageManager` 字段统一指定，避免 GitHub Action 与项目声明版本不一致。
 
 macOS 签名相关 secrets（可选）：
 
