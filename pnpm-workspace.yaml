@@ -8,6 +8,7 @@ allowBuilds:
   electron: true
   esbuild: true
   electron-winstaller: true
+  macos-alias: true
   sharp: true
 
 patchedDependencies:
