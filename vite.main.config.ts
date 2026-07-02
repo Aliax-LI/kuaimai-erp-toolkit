@@ -19,8 +19,9 @@ export default defineConfig({
     alias: {
       '@shared': path.resolve(rootDir, 'src/shared'),
     },
-    conditions: ['node'],
-    mainFields: ['module', 'jsnext:main', 'jsnext'],
+    // 使用 Node.js 解析条件，避免应用 browser 字段（ali-oss 有 browser shim）
+    conditions: ['node', 'electron'],
+    mainFields: ['main', 'module', 'jsnext:main', 'jsnext'],
   },
   build: {
     rollupOptions: {
