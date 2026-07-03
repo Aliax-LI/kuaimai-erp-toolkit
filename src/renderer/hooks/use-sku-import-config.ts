@@ -2,16 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { kuaimai } from '@/lib/kuaimai-client';
 import { logRenderer } from '@/lib/kuaimai-client';
-import type {
-  AccessoryConfig,
-  BrandConfig,
-  SkuImportConfig,
+import {
+  DEFAULT_SKU_IMPORT_CONFIG,
+  type AccessoryConfig,
+  type BrandConfig,
+  type SkuImportConfig,
+  type SkuImportRules,
 } from '@shared/schemas/sku-import-config';
 
-const EMPTY_CONFIG: SkuImportConfig = { brands: [], accessories: [] };
-
 export function useSkuImportConfig() {
-  const [config, setConfig] = useState<SkuImportConfig>(EMPTY_CONFIG);
+  const [config, setConfig] = useState<SkuImportConfig>(DEFAULT_SKU_IMPORT_CONFIG);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -52,5 +52,10 @@ export function useSkuImportConfig() {
     [config, persist],
   );
 
-  return { config, loading, saving, refresh, saveBrands, saveAccessories };
+  const saveRules = useCallback(
+    (rules: SkuImportRules) => persist({ ...config, rules }),
+    [config, persist],
+  );
+
+  return { config, loading, saving, refresh, saveBrands, saveAccessories, saveRules };
 }

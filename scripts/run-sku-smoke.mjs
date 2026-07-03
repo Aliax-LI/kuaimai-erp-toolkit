@@ -14,9 +14,9 @@ if (fs.existsSync(scriptsEnv)) {
 await import('dotenv/config');
 
 import { loadConfigFromEnv } from '../src/core/erp-oss-uploader.ts';
+import { loadSkuImportConfigFile, resolveSkuImportConfigPath } from '../src/core/sku-import-config-storage.ts';
 import { createErpWebClient } from '../src/core/erp-web-client.ts';
 import { SKU_IMPORT_SHEET_NAME } from '../src/shared/types/sku-import.ts';
-import { DEFAULT_SKU_IMPORT_CONFIG } from '../src/shared/schemas/sku-import-config.ts';
 import { createErpCatalogClient } from '../src/tools/sku-import/erp-catalog.ts';
 import { executeSkuImportRows } from '../src/tools/sku-import/executor.ts';
 import { loadErpWebConfigFromEnv } from '../src/tools/sku-import/load-erp-config-from-env.ts';
@@ -121,12 +121,14 @@ async function main() {
   logStep(1, 6, '解析 fixture', true, `品牌=${dataRow.values['品牌']} 货号=${dataRow.values['商品SKU货号']}`);
   logStep(2, 6, '白底图', true, resolvedImagePath);
 
+  const importConfig = loadSkuImportConfigFile(resolveSkuImportConfigPath(rootDir));
+
   const preview = await buildSkuImportPreview(
     'smoke',
     txtPath,
     parsedWorkbook,
     catalog,
-    DEFAULT_SKU_IMPORT_CONFIG,
+    importConfig,
   );
   const previewRow = preview.rows.find((row) => row.rowNumber === dataRow.rowNumber);
   if (!previewRow) {

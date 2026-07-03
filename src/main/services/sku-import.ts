@@ -9,7 +9,7 @@ import type {
   SkuImportTaskDetail,
   SkuImportTaskSummary,
 } from '@shared/types/sku-import';
-import { SKU_IMPORT_SHEET_NAME } from '@shared/types/sku-import';
+import { SKU_IMPORT_SHEET_NAME, summarizeSkuImportExecuteRows } from '@shared/types/sku-import';
 
 import { createErpWebClient } from '../../core/erp-web-client';
 import { createErpCatalogClient } from '../../tools/sku-import/erp-catalog';
@@ -70,6 +70,9 @@ function loadParsedWithWorkbook(task: SkuImportJobRecord): Promise<ParsedSkuImpo
 
 function toTaskSummary(task: SkuImportJobRecord): SkuImportTaskSummary {
   const verifyFailedCount = task.executeResult?.rows.filter((row) => row.verifyOk === false).length;
+  const executeCounts = task.executeResult
+    ? summarizeSkuImportExecuteRows(task.executeResult.rows, task.preview.totalRows)
+    : null;
   return {
     taskId: task.id,
     filePath: task.filePath,
@@ -81,8 +84,8 @@ function toTaskSummary(task: SkuImportJobRecord): SkuImportTaskSummary {
     readyCount: task.preview.readyCount,
     blockedCount: task.preview.blockedCount,
     skippedCount: task.preview.skippedCount,
-    succeededCount: task.executeResult?.succeededCount,
-    failedCount: task.executeResult?.failedCount,
+    succeededCount: executeCounts?.succeededCount,
+    failedCount: executeCounts?.failedCount,
     verifyFailedCount: verifyFailedCount || undefined,
     failureMessage: task.failureMessage,
   };
@@ -138,6 +141,7 @@ async function enrichExecuteResultWithVerification(
 
   return {
     ...executeResult,
+    ...summarizeSkuImportExecuteRows(enrichedRows, task.preview.totalRows),
     rows: enrichedRows,
   };
 }
@@ -295,7 +299,10 @@ export async function executeSkuImportTask(taskId: string): Promise<SkuImportTas
       ...task.parsed,
       rows: parsed.rows,
     };
-    task.executeResult = await enrichExecuteResultWithVerification(task, executeResult);
+    task.executeResult = await enrichExecuteResultWithVerification(task, {
+      ...executeResult,
+      ...summarizeSkuImportExecuteRows(executeResult.rows, task.preview.totalRows),
+    });
     task.status = 'completed';
     task.updatedAt = new Date().toISOString();
 

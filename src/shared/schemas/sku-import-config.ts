@@ -14,13 +14,54 @@ export const accessoryConfigSchema = z.object({
   enabled: z.boolean().default(true),
 });
 
-export const skuImportConfigSchema = z.object({
-  brands: z.array(brandConfigSchema).default([]),
-  accessories: z.array(accessoryConfigSchema).default([]),
+export const skuImportRulesSchema = z.object({
+  skuCodePrefix: z.string().trim().default(''),
+  bundleCategoryName: z.string().trim().default(''),
+  stickerUnitName: z.string().trim().default(''),
 });
 
 export type BrandConfig = z.infer<typeof brandConfigSchema>;
 export type AccessoryConfig = z.infer<typeof accessoryConfigSchema>;
+export type SkuImportRules = z.infer<typeof skuImportRulesSchema>;
+
+export const DEFAULT_SKU_IMPORT_RULES: SkuImportRules = {
+  skuCodePrefix: '69',
+  bundleCategoryName: '家居清洗类（组合装）',
+  stickerUnitName: '张',
+};
+
+export function resolveSkuImportRules(
+  config: { rules?: Partial<SkuImportRules> },
+): SkuImportRules {
+  const rules = config.rules ?? {};
+  return {
+    skuCodePrefix:
+      rules.skuCodePrefix !== undefined
+        ? rules.skuCodePrefix
+        : DEFAULT_SKU_IMPORT_RULES.skuCodePrefix,
+    bundleCategoryName:
+      rules.bundleCategoryName !== undefined
+        ? rules.bundleCategoryName
+        : DEFAULT_SKU_IMPORT_RULES.bundleCategoryName,
+    stickerUnitName:
+      rules.stickerUnitName !== undefined
+        ? rules.stickerUnitName
+        : DEFAULT_SKU_IMPORT_RULES.stickerUnitName,
+  };
+}
+
+export const skuImportConfigSchema = z
+  .object({
+    brands: z.array(brandConfigSchema).default([]),
+    accessories: z.array(accessoryConfigSchema).default([]),
+    rules: skuImportRulesSchema.partial().default({}),
+  })
+  .transform((data) => ({
+    brands: data.brands,
+    accessories: data.accessories,
+    rules: resolveSkuImportRules(data),
+  }));
+
 export type SkuImportConfig = z.infer<typeof skuImportConfigSchema>;
 
 export const DEFAULT_SKU_IMPORT_CONFIG: SkuImportConfig = {
@@ -30,10 +71,9 @@ export const DEFAULT_SKU_IMPORT_CONFIG: SkuImportConfig = {
     { name: 'nimi', code: '51', shortName: 'N', enabled: true },
   ],
   accessories: [
-    { name: '补色膏', skuCode: 'YP-BSG01', brand: 'wkau', enabled: true },
-    { name: '固色剂', skuCode: 'GSJ02', brand: 'wkau', enabled: true },
-    { name: '护理液', skuCode: 'HLY03', brand: 'lovi', enabled: true },
+    { name: '面膜刷', skuCode: 'PJ-MMS01', brand: '', enabled: true },
     { name: '自粘袋', skuCode: 'PJ-ZND01', brand: '', enabled: true },
     { name: '说明书', skuCode: 'PJ-SHMS01', brand: '', enabled: true },
   ],
+  rules: { ...DEFAULT_SKU_IMPORT_RULES },
 };

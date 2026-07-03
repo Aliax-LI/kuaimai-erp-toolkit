@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Hash, Package, Pen, Plus, PlugZap, Save, Search, Tag, Trash2 } from 'lucide-react';
+import { Check, Hash, Package, Pen, Plus, PlugZap, Save, Search, Tag, Trash2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 import { Modal } from '@/components/shared/modal';
@@ -10,17 +10,14 @@ import { SECRETS_UPDATED_EVENT } from '@/hooks/use-connection-status';
 import { useSkuImportConfig } from '@/hooks/use-sku-import-config';
 import { useToast } from '@/hooks/use-toast';
 import { kuaimai } from '@/lib/kuaimai-client';
-import {
-  BUNDLE_CATEGORY_NAME,
-  SKU_CODE_PREFIX,
-  SKU_CODE_TEST_PREFIX,
-  STICKER_CATEGORY_NAME,
-  STICKER_UNIT_NAME,
-} from '@/lib/sku-import-display-constants';
 import { cn } from '@/lib/utils';
 import { CONFIG_TABS, parseConfigTab, type ConfigTab } from '@shared/constants/navigation';
 import { DEFAULT_ERP_BASE_URL } from '@shared/constants/erp';
-import type { AccessoryConfig, BrandConfig } from '@shared/schemas/sku-import-config';
+import {
+  type AccessoryConfig,
+  type BrandConfig,
+  type SkuImportRules,
+} from '@shared/schemas/sku-import-config';
 import type { ErpConnectionTestResult } from '@shared/types/erp-connection';
 
 const TAB_META: Record<ConfigTab, { label: string; icon: typeof Tag; description: string }> = {
@@ -28,11 +25,16 @@ const TAB_META: Record<ConfigTab, { label: string; icon: typeof Tag; description
   brands: { label: '品牌配置', icon: Tag, description: '管理品牌编码与简写' },
   accessories: { label: '配件配置', icon: Package, description: '管理配件 SKU 编码' },
   rules: { label: '编码规则', icon: Hash, description: '货号生成规则' },
-  categories: { label: '分类配置', icon: Tag, description: '贴纸与套装分类' },
 };
 
 const EMPTY_BRAND: BrandConfig = { name: '', code: '', shortName: '', enabled: true };
 const EMPTY_ACCESSORY: AccessoryConfig = { name: '', skuCode: '', brand: '', enabled: true };
+
+const RULE_FIELDS: Array<{ key: keyof SkuImportRules; label: string }> = [
+  { key: 'skuCodePrefix', label: '货号前缀' },
+  { key: 'bundleCategoryName', label: '套装分类' },
+  { key: 'stickerUnitName', label: '贴纸单位' },
+];
 
 export function ConfigPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -46,13 +48,25 @@ export function ConfigPage() {
   const [erpBaseUrl, setErpBaseUrl] = useState(DEFAULT_ERP_BASE_URL);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [testResult, setTestResult] = useState<ErpConnectionTestResult | null>(null);
 
-  const { config, loading, saving: catalogSaving, saveBrands, saveAccessories } =
+  useEffect(() => {
+    if (!saveSuccess) {
+      return;
+    }
+    const timer = window.setTimeout(() => setSaveSuccess(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [saveSuccess]);
+
+  const { config, loading, saving: catalogSaving, refresh, saveBrands, saveAccessories, saveRules } =
     useSkuImportConfig();
   const [brandSearch, setBrandSearch] = useState('');
   const [accessorySearch, setAccessorySearch] = useState('');
+  const [brands, setBrands] = useState<BrandConfig[]>([]);
+  const [accessories, setAccessories] = useState<AccessoryConfig[]>([]);
+  const [brandsDirty, setBrandsDirty] = useState(false);
+  const [accessoriesDirty, setAccessoriesDirty] = useState(false);
 
   const [brandDraft, setBrandDraft] = useState<{ index: number | null; value: BrandConfig } | null>(
     null,
@@ -61,19 +75,48 @@ export function ConfigPage() {
     index: number | null;
     value: AccessoryConfig;
   } | null>(null);
+  const [ruleDraft, setRuleDraft] = useState<{
+    key: keyof SkuImportRules;
+    value: string;
+  } | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
 
   useEffect(() => {
     void kuaimai.config.getApp().then((app) => {
       setErpBaseUrl(app.erpBaseUrl || DEFAULT_ERP_BASE_URL);
     });
-    void kuaimai.config.getSecretsMeta().then((meta) => {
-      setErpCookieSet(Boolean(meta.erpCookie));
-      setErpCompanyIdSet(Boolean(meta.erpCompanyId));
+    void kuaimai.config.getSecrets().then((secrets) => {
+      setErpCookie(secrets.erpCookie);
+      setErpCompanyId(secrets.erpCompanyId);
+      setErpCookieSet(Boolean(secrets.erpCookie));
+      setErpCompanyIdSet(Boolean(secrets.erpCompanyId));
     });
   }, []);
 
+  useEffect(() => {
+    if (tab === 'brands' || tab === 'accessories') {
+      void refresh().catch((err) => {
+        toast(err instanceof Error ? err.message : '加载配置失败');
+      });
+    }
+  }, [tab, refresh, toast]);
+
+  useEffect(() => {
+    if (tab === 'brands') {
+      setBrands(config.brands);
+      setBrandsDirty(false);
+    }
+  }, [tab, config.brands]);
+
+  useEffect(() => {
+    if (tab === 'accessories') {
+      setAccessories(config.accessories);
+      setAccessoriesDirty(false);
+    }
+  }, [tab, config.accessories]);
+
   const setTab = (next: ConfigTab) => {
+    setSaveSuccess(false);
     setSearchParams({ tab: next });
   };
 
@@ -94,28 +137,24 @@ export function ConfigPage() {
 
   const handleSaveErp = async () => {
     setSaving(true);
-    setMessage(null);
+    setSaveSuccess(false);
     try {
-      const secretPatch: Record<string, string> = {};
-      if (erpCookie.trim()) {
-        secretPatch.erpCookie = erpCookie.trim();
+      const cookie = erpCookie.trim();
+      const companyId = erpCompanyId.trim();
+      if (cookie) {
+        await kuaimai.config.setSecrets({ erpCookie: cookie });
+      } else {
+        await kuaimai.config.deleteSecrets(['erpCookie']);
       }
-      if (erpCompanyId.trim()) {
-        secretPatch.erpCompanyId = erpCompanyId.trim();
+      if (companyId) {
+        await kuaimai.config.setSecrets({ erpCompanyId: companyId });
+      } else {
+        await kuaimai.config.deleteSecrets(['erpCompanyId']);
       }
-      if (Object.keys(secretPatch).length > 0) {
-        await kuaimai.config.setSecrets(secretPatch);
-        if (secretPatch.erpCookie) {
-          setErpCookie('');
-          setErpCookieSet(true);
-        }
-        if (secretPatch.erpCompanyId) {
-          setErpCompanyId('');
-          setErpCompanyIdSet(true);
-        }
-      }
+      setErpCookieSet(Boolean(cookie));
+      setErpCompanyIdSet(Boolean(companyId));
       await kuaimai.config.setApp({ erpBaseUrl: erpBaseUrl.trim() || DEFAULT_ERP_BASE_URL });
-      setMessage('已保存，敏感项界面不会回显明文');
+      setSaveSuccess(true);
       window.dispatchEvent(new Event(SECRETS_UPDATED_EVENT));
     } finally {
       setSaving(false);
@@ -124,19 +163,19 @@ export function ConfigPage() {
 
   const filteredBrands = useMemo(() => {
     const q = brandSearch.trim().toLowerCase();
-    if (!q) return config.brands.map((brand, index) => ({ brand, index }));
-    return config.brands
+    if (!q) return brands.map((brand, index) => ({ brand, index }));
+    return brands
       .map((brand, index) => ({ brand, index }))
       .filter(
         ({ brand }) =>
           brand.name.toLowerCase().includes(q) || brand.code.toLowerCase().includes(q),
       );
-  }, [brandSearch, config.brands]);
+  }, [brandSearch, brands]);
 
   const filteredAccessories = useMemo(() => {
     const q = accessorySearch.trim().toLowerCase();
-    if (!q) return config.accessories.map((accessory, index) => ({ accessory, index }));
-    return config.accessories
+    if (!q) return accessories.map((accessory, index) => ({ accessory, index }));
+    return accessories
       .map((accessory, index) => ({ accessory, index }))
       .filter(
         ({ accessory }) =>
@@ -144,78 +183,132 @@ export function ConfigPage() {
           accessory.skuCode.toLowerCase().includes(q) ||
           accessory.brand.toLowerCase().includes(q),
       );
-  }, [accessorySearch, config.accessories]);
+  }, [accessorySearch, accessories]);
 
-  const commitBrand = async () => {
+  const commitBrand = () => {
     if (!brandDraft) return;
     const value = brandDraft.value;
     if (!value.name.trim() || !value.code.trim()) {
       setDraftError('品牌名称与编码不能为空');
       return;
     }
-    const next = [...config.brands];
+    const next = [...brands];
     if (brandDraft.index === null) {
       next.push(value);
     } else {
       next[brandDraft.index] = value;
     }
-    try {
-      await saveBrands(next);
-      setBrandDraft(null);
-      setDraftError(null);
-      toast('品牌已保存');
-    } catch (err) {
-      setDraftError(err instanceof Error ? err.message : String(err));
-    }
+    setBrands(next);
+    setBrandsDirty(true);
+    setBrandDraft(null);
+    setDraftError(null);
   };
 
-  const removeBrand = async (index: number) => {
-    const next = config.brands.filter((_, i) => i !== index);
-    await saveBrands(next);
-    toast('品牌已删除');
+  const removeBrand = (index: number) => {
+    setBrands(brands.filter((_, i) => i !== index));
+    setBrandsDirty(true);
   };
 
-  const toggleBrand = async (index: number) => {
-    const next = config.brands.map((brand, i) =>
-      i === index ? { ...brand, enabled: !brand.enabled } : brand,
+  const toggleBrand = (index: number) => {
+    setBrands(
+      brands.map((brand, i) => (i === index ? { ...brand, enabled: !brand.enabled } : brand)),
     );
-    await saveBrands(next);
+    setBrandsDirty(true);
   };
 
-  const commitAccessory = async () => {
+  const commitAccessory = () => {
     if (!accessoryDraft) return;
     const value = accessoryDraft.value;
     if (!value.name.trim() || !value.skuCode.trim()) {
       setDraftError('配件名称与 SKU 编码不能为空');
       return;
     }
-    const next = [...config.accessories];
+    const next = [...accessories];
     if (accessoryDraft.index === null) {
       next.push(value);
     } else {
       next[accessoryDraft.index] = value;
     }
+    setAccessories(next);
+    setAccessoriesDirty(true);
+    setAccessoryDraft(null);
+    setDraftError(null);
+  };
+
+  const removeAccessory = (index: number) => {
+    setAccessories(accessories.filter((_, i) => i !== index));
+    setAccessoriesDirty(true);
+  };
+
+  const toggleAccessory = (index: number) => {
+    setAccessories(
+      accessories.map((accessory, i) =>
+        i === index ? { ...accessory, enabled: !accessory.enabled } : accessory,
+      ),
+    );
+    setAccessoriesDirty(true);
+  };
+
+  const handleSaveBrands = async () => {
+    const invalid = brands.find((brand) => !brand.name.trim() || !brand.code.trim());
+    if (invalid) {
+      toast('品牌名称与编码不能为空');
+      return;
+    }
     try {
-      await saveAccessories(next);
-      setAccessoryDraft(null);
+      await saveBrands(brands);
+      setBrandsDirty(false);
+      setSaveSuccess(true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '保存失败');
+    }
+  };
+
+  const handleSaveAccessories = async () => {
+    const invalid = accessories.find(
+      (accessory) => !accessory.name.trim() || !accessory.skuCode.trim(),
+    );
+    if (invalid) {
+      toast('配件名称与 SKU 编码不能为空');
+      return;
+    }
+    try {
+      await saveAccessories(accessories);
+      setAccessoriesDirty(false);
+      setSaveSuccess(true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '保存失败');
+    }
+  };
+
+  const clearErpSecret = async (key: 'erpCookie' | 'erpCompanyId') => {
+    await kuaimai.config.deleteSecrets([key]);
+    if (key === 'erpCookie') {
+      setErpCookie('');
+      setErpCookieSet(false);
+    } else {
+      setErpCompanyId('');
+      setErpCompanyIdSet(false);
+    }
+    window.dispatchEvent(new Event(SECRETS_UPDATED_EVENT));
+    toast(key === 'erpCookie' ? 'Cookie 已清除' : 'companyId 已清除');
+  };
+
+  const commitRule = async () => {
+    if (!ruleDraft) return;
+    try {
+      await saveRules({ ...config.rules, [ruleDraft.key]: ruleDraft.value.trim() });
+      setRuleDraft(null);
       setDraftError(null);
-      toast('配件已保存');
+      setSaveSuccess(true);
     } catch (err) {
       setDraftError(err instanceof Error ? err.message : String(err));
     }
   };
 
-  const removeAccessory = async (index: number) => {
-    const next = config.accessories.filter((_, i) => i !== index);
-    await saveAccessories(next);
-    toast('配件已删除');
-  };
-
-  const toggleAccessory = async (index: number) => {
-    const next = config.accessories.map((accessory, i) =>
-      i === index ? { ...accessory, enabled: !accessory.enabled } : accessory,
-    );
-    await saveAccessories(next);
+  const clearRule = async (key: keyof SkuImportRules) => {
+    await saveRules({ ...config.rules, [key]: '' });
+    toast('已清空');
   };
 
   return (
@@ -227,6 +320,7 @@ export function ConfigPage() {
         </div>
         {tab === 'erp' && (
           <div className="flex items-center gap-2">
+            {saveSuccess && <Check className="h-4 w-4 text-status-success" aria-hidden />}
             <Button
               type="button"
               variant="secondary"
@@ -241,6 +335,37 @@ export function ConfigPage() {
               {saving ? '保存中…' : '保存配置'}
             </Button>
           </div>
+        )}
+        {tab === 'brands' && (
+          <div className="flex items-center gap-3">
+            {saveSuccess && <Check className="h-4 w-4 text-status-success" aria-hidden />}
+            {brandsDirty && <span className="text-xs text-amber">有未保存的更改</span>}
+            <Button
+              type="button"
+              onClick={() => void handleSaveBrands()}
+              disabled={!brandsDirty || catalogSaving || loading}
+            >
+              <Save className="h-4 w-4" />
+              {catalogSaving ? '保存中…' : '保存配置'}
+            </Button>
+          </div>
+        )}
+        {tab === 'accessories' && (
+          <div className="flex items-center gap-3">
+            {saveSuccess && <Check className="h-4 w-4 text-status-success" aria-hidden />}
+            {accessoriesDirty && <span className="text-xs text-amber">有未保存的更改</span>}
+            <Button
+              type="button"
+              onClick={() => void handleSaveAccessories()}
+              disabled={!accessoriesDirty || catalogSaving || loading}
+            >
+              <Save className="h-4 w-4" />
+              {catalogSaving ? '保存中…' : '保存配置'}
+            </Button>
+          </div>
+        )}
+        {tab === 'rules' && saveSuccess && (
+          <Check className="h-4 w-4 text-status-success" aria-hidden />
         )}
       </div>
 
@@ -276,21 +401,42 @@ export function ConfigPage() {
             </StatusBadge>
           </div>
           <label className="block space-y-1">
-            <span className="text-sm font-medium text-charcoal">ERP Cookie</span>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-charcoal">ERP Cookie</span>
+              {erpCookieSet && (
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-xs text-brown-soft transition-colors hover:text-status-danger"
+                  onClick={() => void clearErpSecret('erpCookie')}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  清除
+                </button>
+              )}
+            </div>
             <Input
-              type="password"
-              placeholder={erpCookieSet ? '已保存，输入新值可覆盖' : '从浏览器复制登录 Cookie'}
+              placeholder="从浏览器复制登录 Cookie"
               value={erpCookie}
               onChange={(event) => setErpCookie(event.target.value)}
               autoComplete="off"
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-sm font-medium text-charcoal">companyId</span>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-charcoal">companyId</span>
+              {erpCompanyIdSet && (
+                <button
+                  type="button"
+                  className="flex items-center gap-1 text-xs text-brown-soft transition-colors hover:text-status-danger"
+                  onClick={() => void clearErpSecret('erpCompanyId')}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  清除
+                </button>
+              )}
+            </div>
             <Input
-              placeholder={
-                erpCompanyIdSet ? '已保存，输入新值可覆盖' : '140109（Network 请求头 companyid）'
-              }
+              placeholder="140109（Network 请求头 companyid）"
               value={erpCompanyId}
               onChange={(event) => setErpCompanyId(event.target.value)}
               autoComplete="off"
@@ -304,7 +450,6 @@ export function ConfigPage() {
               autoComplete="off"
             />
           </label>
-          {message && <p className="text-sm text-brown-soft">{message}</p>}
           {testResult && (
             <p
               className={
@@ -359,7 +504,7 @@ export function ConfigPage() {
                     <td className="px-4 py-3 font-mono text-xs">{brand.code}</td>
                     <td className="px-4 py-3">{brand.shortName || '—'}</td>
                     <td className="px-4 py-3">
-                      <button type="button" onClick={() => void toggleBrand(index)}>
+                      <button type="button" onClick={() => toggleBrand(index)}>
                         <StatusBadge tone={brand.enabled ? 'success' : 'neutral'}>
                           {brand.enabled ? '启用' : '停用'}
                         </StatusBadge>
@@ -380,7 +525,7 @@ export function ConfigPage() {
                         <button
                           type="button"
                           className="text-brown-soft transition-colors hover:text-status-danger"
-                          onClick={() => void removeBrand(index)}
+                          onClick={() => removeBrand(index)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -439,7 +584,7 @@ export function ConfigPage() {
                     <td className="px-4 py-3 font-mono text-xs">{accessory.skuCode}</td>
                     <td className="px-4 py-3">{accessory.brand || '—'}</td>
                     <td className="px-4 py-3">
-                      <button type="button" onClick={() => void toggleAccessory(index)}>
+                      <button type="button" onClick={() => toggleAccessory(index)}>
                         <StatusBadge tone={accessory.enabled ? 'success' : 'neutral'}>
                           {accessory.enabled ? '启用' : '停用'}
                         </StatusBadge>
@@ -460,7 +605,7 @@ export function ConfigPage() {
                         <button
                           type="button"
                           className="text-brown-soft transition-colors hover:text-status-danger"
-                          onClick={() => void removeAccessory(index)}
+                          onClick={() => removeAccessory(index)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -478,30 +623,46 @@ export function ConfigPage() {
       )}
 
       {tab === 'rules' && (
-        <div className="grid gap-3 rounded-xl border border-beige bg-cream-white p-5 shadow-sm md:grid-cols-2">
-          {[
-            ['货号前缀', SKU_CODE_PREFIX],
-            ['测试前缀', SKU_CODE_TEST_PREFIX],
-            ['贴纸分类', STICKER_CATEGORY_NAME],
-            ['套装分类', BUNDLE_CATEGORY_NAME],
-            ['贴纸单位', STICKER_UNIT_NAME],
-          ].map(([label, value]) => (
-            <label key={label} className="space-y-1">
-              <span className="text-sm text-brown-soft">{label}</span>
-              <Input readOnly value={value} />
-            </label>
-          ))}
-        </div>
-      )}
-
-      {tab === 'categories' && (
-        <div className="rounded-xl border border-beige bg-cream-white p-12 text-center text-brown-soft">
-          分类配置 UI 外壳
-          <div className="mt-4">
-            <Button variant="dark" onClick={() => toast('即将支持')}>
-              新增分类
-            </Button>
-          </div>
+        <div className="overflow-hidden rounded-xl border border-beige bg-cream-white shadow-sm">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-beige bg-cream/50">
+                <th className="px-4 py-3 text-left font-medium text-brown-soft">规则项</th>
+                <th className="px-4 py-3 text-left font-medium text-brown-soft">当前值</th>
+                <th className="px-4 py-3 text-left font-medium text-brown-soft">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {RULE_FIELDS.map(({ key, label }) => (
+                <tr key={key} className="border-b border-beige/50 hover:bg-cream-warm/30">
+                  <td className="px-4 py-3 font-medium">{label}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{config.rules[key] || '—'}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="text-brown-soft transition-colors hover:text-amber"
+                        onClick={() => {
+                          setDraftError(null);
+                          setRuleDraft({ key, value: config.rules[key] });
+                        }}
+                      >
+                        <Pen className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        className="text-brown-soft transition-colors hover:text-status-danger"
+                        onClick={() => void clearRule(key)}
+                        title="清空"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -578,8 +739,8 @@ export function ConfigPage() {
               >
                 取消
               </Button>
-              <Button onClick={() => void commitBrand()} disabled={catalogSaving}>
-                {catalogSaving ? '保存中…' : '保存'}
+              <Button onClick={commitBrand} disabled={catalogSaving}>
+                确定
               </Button>
             </div>
           </div>
@@ -659,7 +820,49 @@ export function ConfigPage() {
               >
                 取消
               </Button>
-              <Button onClick={() => void commitAccessory()} disabled={catalogSaving}>
+              <Button onClick={commitAccessory} disabled={catalogSaving}>
+                确定
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={ruleDraft !== null}
+        title={
+          ruleDraft
+            ? `编辑${RULE_FIELDS.find((field) => field.key === ruleDraft.key)?.label ?? '规则'}`
+            : '编辑规则'
+        }
+        onClose={() => {
+          setRuleDraft(null);
+          setDraftError(null);
+        }}
+      >
+        {ruleDraft && (
+          <div className="space-y-4">
+            <label className="block space-y-1">
+              <span className="text-sm font-medium text-charcoal">规则值</span>
+              <Input
+                value={ruleDraft.value}
+                onChange={(event) =>
+                  setRuleDraft({ ...ruleDraft, value: event.target.value })
+                }
+              />
+            </label>
+            {draftError && <p className="text-sm text-status-danger">{draftError}</p>}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setRuleDraft(null);
+                  setDraftError(null);
+                }}
+              >
+                取消
+              </Button>
+              <Button onClick={() => void commitRule()} disabled={catalogSaving}>
                 {catalogSaving ? '保存中…' : '保存'}
               </Button>
             </div>

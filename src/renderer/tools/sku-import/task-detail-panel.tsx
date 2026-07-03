@@ -11,6 +11,7 @@ import {
   rowStatusLabel,
 } from '@/tools/sku-import/task-status-labels';
 import type { SkuImportTaskDetail } from '@shared/types/sku-import';
+import { summarizeSkuImportExecuteRows } from '@shared/types/sku-import';
 
 type ExecuteFilter = 'success' | 'failed';
 
@@ -35,44 +36,55 @@ export function SkuImportTaskDetailPanel({ detail }: { detail: SkuImportTaskDeta
     if (!executeResult) {
       return [];
     }
-    return executeResult.rows
-      .map((row) => {
-        const previewRow = detail.preview.rows.find((item) => item.rowNumber === row.rowNumber);
+    const resultByRow = new Map(executeResult.rows.map((row) => [row.rowNumber, row]));
+
+    return detail.preview.rows
+      .map((previewRow) => {
+        const row = resultByRow.get(previewRow.rowNumber);
+        const status = row?.status ?? previewRow.status;
         return {
-          ...row,
-          brand: previewRow?.brand ?? '—',
-          productName: previewRow?.productName ?? previewRow?.displayName ?? '—',
-          stickerCode: previewRow?.stickerOuterId || previewRow?.proposedSkuCode || row.skuCode,
-          bundleCode: previewRow?.proposedSkuCode || row.skuCode,
-          detailText: row.failureReason || (row.status === 'succeeded' ? '创建成功' : '—'),
+          rowNumber: previewRow.rowNumber,
+          skuCode: row?.skuCode ?? previewRow.proposedSkuCode,
+          status,
+          failureReason:
+            row?.failureReason ??
+            previewRow.blockedReason ??
+            (status === 'succeeded' ? '' : '未创建成功'),
+          brand: previewRow.brand || '—',
+          productName: previewRow.productName || previewRow.displayName || '—',
+          stickerCode: previewRow.stickerOuterId || previewRow.proposedSkuCode || row?.skuCode || '—',
+          bundleCode: previewRow.proposedSkuCode || row?.skuCode || '—',
+          detailText:
+            row?.failureReason ||
+            previewRow.blockedReason ||
+            (status === 'succeeded' ? '创建成功' : '—'),
         };
       })
       .filter((row) =>
-        filter === 'success' ? row.status === 'succeeded' : row.status === 'failed',
+        filter === 'success' ? row.status === 'succeeded' : row.status !== 'succeeded',
       );
   }, [detail.preview.rows, executeResult, filter]);
 
   if (executeResult) {
-    const totalCount =
-      executeResult.succeededCount + executeResult.failedCount + executeResult.skippedCount;
+    const summary = summarizeSkuImportExecuteRows(executeResult.rows, detail.totalRows);
 
     return (
       <div className="space-y-4 bg-cream/40 p-4">
         <div className="grid grid-cols-3 gap-3">
           <StatCard
             label="成功"
-            value={executeResult.succeededCount}
+            value={summary.succeededCount}
             icon={CircleCheckBig}
             tone="success"
           />
-          <StatCard label="失败" value={executeResult.failedCount} icon={CircleX} tone="danger" />
-          <StatCard label="总计" value={totalCount || detail.totalRows} tone="neutral" />
+          <StatCard label="失败" value={summary.failedCount} icon={CircleX} tone="danger" />
+          <StatCard label="总计" value={detail.totalRows} tone="neutral" />
         </div>
 
         <SegmentedControl
           options={[
-            { value: 'success' as const, label: `成功 (${executeResult.succeededCount})` },
-            { value: 'failed' as const, label: `失败 (${executeResult.failedCount})` },
+            { value: 'success' as const, label: `成功 (${summary.succeededCount})` },
+            { value: 'failed' as const, label: `失败 (${summary.failedCount})` },
           ]}
           value={filter}
           onChange={setFilter}

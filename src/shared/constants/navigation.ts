@@ -4,7 +4,7 @@ export const APP_ROUTES = {
   CONFIG: '/config',
 } as const;
 
-export const CONFIG_TABS = ['erp', 'brands', 'accessories', 'rules', 'categories'] as const;
+export const CONFIG_TABS = ['erp', 'brands', 'accessories', 'rules'] as const;
 export type ConfigTab = (typeof CONFIG_TABS)[number];
 
 export const LEGACY_REDIRECTS: Record<string, string> = {
@@ -18,6 +18,9 @@ export function resolveLegacyRedirect(pathname: string): string | null {
 }
 
 export function parseConfigTab(value: string | null): ConfigTab {
+  if (value === 'categories') {
+    return 'rules';
+  }
   if (value && (CONFIG_TABS as readonly string[]).includes(value)) {
     return value as ConfigTab;
   }

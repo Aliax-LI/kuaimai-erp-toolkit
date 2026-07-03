@@ -1,4 +1,4 @@
-import { SKU_CODE_PREFIX, SKU_CODE_TEST_PREFIX } from './constants';
+import type { SkuImportRules } from '@shared/schemas/sku-import-config';
 
 const ACCESSORY_SPLIT_RE = /[\s,，、;；]+/;
 
@@ -17,43 +17,57 @@ export function buildBusinessKey(values: Record<string, string>): string {
   return [productCode, stickerCode, displayName].filter(Boolean).join('|');
 }
 
-export function deriveProductAbbreviation(productCode: string, productName: string): string {
-  const codeMatch = /YP-([A-Z0-9]+)/i.exec(productCode);
-  if (codeMatch?.[1]) {
-    return codeMatch[1].replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 8);
+/** 产品名首字母大写：英文按词取首字母；含中文时取各汉字首字符（无拼音库时的近似） */
+export function deriveProductNameInitials(productName: string): string {
+  const trimmed = productName.trim();
+  if (!trimmed) {
+    return '';
   }
 
-  const compactName = productName.replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, '').slice(0, 6);
-  return compactName || 'ITEM';
+  const latinWords = trimmed.match(/[A-Za-z]+/g);
+  if (latinWords && latinWords.length > 0) {
+    return latinWords.map((word) => word[0].toUpperCase()).join('');
+  }
+
+  const cjkChars = [...trimmed].filter((char) => /[\u4e00-\u9fa5]/.test(char));
+  if (cjkChars.length > 0) {
+    return cjkChars.join('');
+  }
+
+  return trimmed[0].toUpperCase();
+}
+
+/** 从产品原品编码提取产品简写，如 YP-BYMPGXJ01 → BYMPGXJ */
+export function deriveProductShortCode(productCode: string): string {
+  const primary = productCode.trim().replace(/^YP-/i, '').split('-')[0]?.trim() ?? '';
+  if (!primary) {
+    return '';
+  }
+
+  const versionMatch = primary.match(/^([A-Za-z]{4,})(\d{2})$/);
+  if (versionMatch) {
+    return versionMatch[1].toUpperCase();
+  }
+
+  return primary.toUpperCase();
 }
 
 export function buildStickerOuterId(bundleOuterId: string): string {
   return `${bundleOuterId}-ST`;
 }
 
-export function buildSkuCodePrefix(
-  brandCode: string,
+/** 套装货号：{前缀}-{品牌}-{产品简写}-{贴纸编码} */
+export function buildBundleOuterId(
+  rules: Pick<SkuImportRules, 'skuCodePrefix'>,
+  brandName: string,
   productCode: string,
-  productName: string,
+  stickerCode: string,
 ): string {
-  const normalizedBrandCode = brandCode.replace(/[^A-Z0-9]/gi, '').toUpperCase() || 'BRAND';
-  const abbr = deriveProductAbbreviation(productCode, productName);
-  return `${SKU_CODE_TEST_PREFIX}-${SKU_CODE_PREFIX}-${normalizedBrandCode}-${abbr}`;
-}
-
-export function allocateNextSkuCode(prefix: string, existingOuterIds: string[]): string {
-  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const sequencePattern = new RegExp(`^${escapedPrefix}(\\d+)$`, 'i');
-  let maxSequence = 0;
-
-  for (const outerId of existingOuterIds) {
-    const match = sequencePattern.exec(outerId.trim());
-    if (match?.[1]) {
-      maxSequence = Math.max(maxSequence, Number.parseInt(match[1], 10));
-    }
-  }
-
-  return `${prefix}${String(maxSequence + 1).padStart(3, '0')}`;
+  const prefix = rules.skuCodePrefix.trim();
+  const brand = brandName.trim().toLowerCase().replace(/\s+/g, '');
+  const productShort = deriveProductShortCode(productCode);
+  const sticker = stickerCode.trim();
+  return `${prefix}-${brand}-${productShort}-${sticker}`;
 }
 
 export function buildStickerTitle(
@@ -67,9 +81,11 @@ export function buildStickerTitle(
 export function buildBundleTitle(
   brand: string,
   productName: string,
+  displayName: string,
   accessories: string[],
 ): string {
-  const parts = [`${brand}${productName}*1`, ...accessories.map((item) => `${item}*1`)];
+  const packageLabel = displayName.trim() || productName;
+  const parts = [`${brand}${productName} - ${packageLabel}*1`, ...accessories.map((item) => `${item}*1`)];
   return parts.join('+');
 }
 

@@ -28,6 +28,7 @@ function baseRow(overrides: Partial<SkuImportPreviewRow>): SkuImportPreviewRow {
     matchedAccessorySkus: [],
     bundleCategory: '',
     stickerCategory: '',
+    stickerUnit: '张',
     ...overrides,
   };
 }
@@ -57,7 +58,7 @@ describe('preview row labels', () => {
           blockedReason: 'ERP 中已存在套装货号，将跳过创建',
         }),
       ),
-    ).toBe('ERP 中已存在套装货号，将跳过创建');
+    ).toBe('ERP 中已存在套装货号 test-69-WKAU-001，将跳过创建');
   });
 
   it('previewRowStatusTone 应按状态分配色调', () => {

@@ -15,7 +15,7 @@
   "main": ".vite/build/index.js",
   "scripts": {
     "postinstall": "node scripts/ensure-electron.mjs",
-    "start": "node scripts/build-app.mjs && electron .",
+    "start": "node scripts/build-app.mjs && electron . --no-sandbox",
     "build": "node scripts/build-app.mjs",
     "build:main": "vite build --config vite.main.config.ts",
     "build:preload": "vite build --config vite.preload.config.ts",
@@ -83,6 +83,9 @@
       "main": ".vite/build/index.js"
     },
     "asar": true,
+    "asarUnpack": [
+      "resources/defaults/**"
+    ],
     "npmRebuild": false,
     "buildDependenciesFromSource": false,
     "icon": "resources/icon.png",
@@ -111,6 +114,9 @@
     "linux": {
       "icon": "resources/icon.png",
       "category": "Utility",
+      "executableArgs": [
+        "--no-sandbox"
+      ],
       "target": [
         "deb",
         "rpm"

@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  allocateNextSkuCode,
+  buildBundleOuterId,
+  buildBundleTitle,
   buildBusinessKey,
-  buildSkuCodePrefix,
   buildStickerTitle,
+  deriveProductNameInitials,
+  deriveProductShortCode,
   isSkuImportDataRow,
   parseAccessoryNames,
   validateImportRow,
 } from '../src/tools/sku-import/domain';
+import { DEFAULT_SKU_IMPORT_RULES } from '@shared/schemas/sku-import-config';
 
 describe('sku-import domain', () => {
   it('parseAccessoryNames 应按空白拆分并去重', () => {
@@ -25,17 +28,41 @@ describe('sku-import domain', () => {
     ).toBe('YP-CJJ01-01|07460088|除胶剂50g黑瓶喷雾');
   });
 
-  it('buildSkuCodePrefix 应使用配置品牌编码与原品缩写', () => {
-    expect(buildSkuCodePrefix('39', 'YP-CJJ01-01', '强力除胶剂')).toBe('test-69-39-CJJ01');
+  it('deriveProductNameInitials 英文产品名取词首字母', () => {
+    expect(deriveProductNameInitials('test')).toBe('T');
+    expect(deriveProductNameInitials('Oil Cleaner')).toBe('OC');
   });
 
-  it('allocateNextSkuCode 应基于已有货号递增', () => {
-    const next = allocateNextSkuCode('test-69-39-CJJ01', [
-      'test-69-39-CJJ01001',
-      'test-69-39-CJJ01007',
-      'test-69-39-OTHER001',
-    ]);
-    expect(next).toBe('test-69-39-CJJ01008');
+  it('deriveProductShortCode 应从原品编码提取产品简写', () => {
+    expect(deriveProductShortCode('YP-BYMPGXJ01')).toBe('BYMPGXJ');
+    expect(deriveProductShortCode('YP-CJJ01-01')).toBe('CJJ01');
+  });
+
+  it('buildBundleOuterId 应按前缀-品牌-产品简写-贴纸编码生成', () => {
+    expect(
+      buildBundleOuterId(DEFAULT_SKU_IMPORT_RULES, 'WKAU', 'YP-BYMPGXJ01', 'test09590724'),
+    ).toBe('69-wkau-BYMPGXJ-test09590724');
+    expect(
+      buildBundleOuterId(
+        { skuCodePrefix: 'test69' },
+        'wkau',
+        'YP-BYMPGXJ01',
+        'tets09590724',
+      ),
+    ).toBe('test69-wkau-BYMPGXJ-tets09590724');
+  });
+
+  it('buildBundleTitle 应包含名称列容量包装信息', () => {
+    expect(
+      buildBundleTitle('jokjok', '油污清洁剂', '30ml黑色pe瓶（跨境）', [
+        '自粘袋',
+        '跨境说明书',
+        '海绵',
+        '喷头',
+      ]),
+    ).toBe(
+      'jokjok油污清洁剂 - 30ml黑色pe瓶（跨境）*1+自粘袋*1+跨境说明书*1+海绵*1+喷头*1',
+    );
   });
 
   it('buildStickerTitle 应拼接贴纸名称', () => {

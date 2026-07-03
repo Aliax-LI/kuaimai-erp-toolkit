@@ -11,7 +11,7 @@ function normalizeKey(value: string): string {
 
 export function findBrandInConfig(
   brandName: string,
-  config: SkuImportConfig,
+  config: Pick<SkuImportConfig, 'brands'>,
 ): BrandConfig | undefined {
   const key = normalizeKey(brandName);
   return config.brands.find((brand) => normalizeKey(brand.name) === key);
@@ -19,7 +19,7 @@ export function findBrandInConfig(
 
 export function resolveBrandCodeFromConfig(
   brandName: string,
-  config: SkuImportConfig,
+  config: Pick<SkuImportConfig, 'brands'>,
 ): { code: string } | { error: string } {
   const brand = findBrandInConfig(brandName, config);
   if (!brand) {
@@ -37,7 +37,7 @@ export function resolveBrandCodeFromConfig(
 export function matchAccessoriesFromConfig(
   accessoryNames: string[],
   rowBrand: string,
-  config: SkuImportConfig,
+  config: Pick<SkuImportConfig, 'accessories'>,
 ): { matched: ConfigAccessoryMatch[]; missing: string[] } {
   const matched: ConfigAccessoryMatch[] = [];
   const missing: string[] = [];

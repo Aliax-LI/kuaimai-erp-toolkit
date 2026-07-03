@@ -118,6 +118,14 @@ export function getSecretsMeta(): Record<string, boolean> {
   return Object.fromEntries(Object.keys(secrets).map((key) => [key, true]));
 }
 
+export function getErpSecrets(): { erpCookie: string; erpCompanyId: string } {
+  const secrets = getStore().secrets;
+  return {
+    erpCookie: secrets.erpCookie ?? '',
+    erpCompanyId: secrets.erpCompanyId ?? '',
+  };
+}
+
 /** 主进程内部读取敏感项（不暴露给渲染进程） */
 export function getSecret(key: string): string | undefined {
   return getStore().secrets[key];
@@ -126,6 +134,16 @@ export function getSecret(key: string): string | undefined {
 export function setSecrets(partial: SecretsRecord): Record<string, boolean> {
   const store = getStore();
   store.secrets = { ...store.secrets, ...partial };
+  store.updatedAt = new Date().toISOString();
+  writeStore(store);
+  return getSecretsMeta();
+}
+
+export function deleteSecrets(keys: string[]): Record<string, boolean> {
+  const store = getStore();
+  for (const key of keys) {
+    delete store.secrets[key];
+  }
   store.updatedAt = new Date().toISOString();
   writeStore(store);
   return getSecretsMeta();

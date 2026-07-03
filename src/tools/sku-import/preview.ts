@@ -1,20 +1,13 @@
 import type { MatchedAccessorySku } from '@shared/types/sku-import';
 import type { SkuImportPreviewRow, SkuImportPreviewResult } from '@shared/types/sku-import';
 import type { SkuImportConfig } from '@shared/schemas/sku-import-config';
+import { resolveSkuImportRules } from '@shared/schemas/sku-import-config';
 
+import { STICKER_CATEGORY_NAME } from './constants';
+import { matchAccessoriesFromConfig, resolveBrandCodeFromConfig } from './catalog-config';
 import {
-  BUNDLE_CATEGORY_NAME,
-  STICKER_CATEGORY_NAME,
-} from './constants';
-import {
-  matchAccessoriesFromConfig,
-  resolveBrandCodeFromConfig,
-} from './catalog-config';
-import {
-  allocateNextSkuCode,
+  buildBundleOuterId,
   buildBusinessKey,
-  buildSkuCodePrefix,
-  buildStickerOuterId,
   buildStickerTitle,
   buildBundleTitle,
   normalizeImportRowValues,
@@ -64,7 +57,9 @@ function previewRowBase(input: {
   productOriginalOuterId: string;
   accessoryMatch: { matched: string[]; missing: string[] };
   matchedAccessorySkus: MatchedAccessorySku[];
+  rules: ReturnType<typeof resolveSkuImportRules>;
 }): Omit<SkuImportPreviewRow, 'status' | 'blockedReason' | 'existingSkuCode'> {
+  const displayName = input.normalized.displayName || input.normalized.productName;
   return {
     rowNumber: input.rowNumber,
     businessKey: input.businessKey,
@@ -72,7 +67,7 @@ function previewRowBase(input: {
     productName: input.normalized.productName,
     capacity: input.normalized.capacity,
     stickerCode: input.normalized.stickerCode,
-    displayName: input.normalized.displayName || input.normalized.productName,
+    displayName,
     accessories: input.accessories,
     proposedSkuCode: input.proposedSkuCode,
     stickerTitle: buildStickerTitle(
@@ -83,6 +78,7 @@ function previewRowBase(input: {
     bundleTitle: buildBundleTitle(
       input.normalized.brand,
       input.normalized.productName,
+      displayName,
       input.accessories,
     ),
     matchedAccessoryCodes: input.accessoryMatch.matched,
@@ -90,8 +86,9 @@ function previewRowBase(input: {
     productOriginalOuterId: input.productOriginalOuterId,
     stickerOuterId: input.stickerOuterId,
     matchedAccessorySkus: input.matchedAccessorySkus,
-    bundleCategory: BUNDLE_CATEGORY_NAME,
+    bundleCategory: input.rules.bundleCategoryName,
     stickerCategory: STICKER_CATEGORY_NAME,
+    stickerUnit: input.rules.stickerUnitName,
   };
 }
 
@@ -103,6 +100,7 @@ export async function buildSkuImportPreview(
   importConfig: SkuImportConfig,
 ): Promise<SkuImportPreviewResult> {
   const rows: SkuImportPreviewRow[] = [];
+  const rules = resolveSkuImportRules(importConfig);
 
   for (const row of parsed.rows) {
     const validationError = validateImportRow(row.values);
@@ -112,18 +110,10 @@ export async function buildSkuImportPreview(
     const productOriginalOuterId = normalized.productCode;
 
     const brandResolved = resolveBrandCodeFromConfig(normalized.brand, importConfig);
-    const prefix =
-      'code' in brandResolved
-        ? buildSkuCodePrefix(brandResolved.code, normalized.productCode, normalized.productName)
-        : '';
-
-    const prefixOuterIds =
-      'code' in brandResolved && !normalized.existingSkuCode
-        ? await catalog.listOuterIdsByPrefix(prefix)
-        : [];
     const proposedSkuCode =
-      normalized.existingSkuCode || allocateNextSkuCode(prefix, prefixOuterIds);
-    const stickerOuterId = buildStickerOuterId(proposedSkuCode);
+      normalized.existingSkuCode ||
+      buildBundleOuterId(rules, normalized.brand, normalized.productCode, normalized.stickerCode);
+    const stickerOuterId = normalized.stickerCode;
 
     const existingItems = await catalog.getItemsByOuterIds([proposedSkuCode, stickerOuterId]);
     const existingOuterIds = new Set(existingItems.map((item) => item.outerId));
@@ -149,6 +139,7 @@ export async function buildSkuImportPreview(
         missing: configAccessoryMatch.missing,
       },
       matchedAccessorySkus: [],
+      rules,
     });
 
     if (validationError) {
@@ -185,7 +176,7 @@ export async function buildSkuImportPreview(
         proposedSkuCode,
         existingSkuCode: proposedSkuCode,
         status: 'skipped_existing',
-        blockedReason: 'ERP 中已存在套装货号，将跳过创建',
+        blockedReason: `ERP 中已存在套装货号 ${proposedSkuCode}，将跳过创建`,
       });
       continue;
     }

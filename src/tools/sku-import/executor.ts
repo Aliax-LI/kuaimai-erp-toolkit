@@ -1,9 +1,12 @@
 import { uploadToErpOss } from '../../core/erp-oss-uploader';
 import type { ErpOssConfig } from '../../core/erp-oss-uploader';
-import type { SkuImportExecuteResult, SkuImportPreviewRow } from '@shared/types/sku-import';
+import {
+  summarizeSkuImportExecuteRows,
+  type SkuImportExecuteResult,
+  type SkuImportPreviewRow,
+} from '@shared/types/sku-import';
 
-import { BUNDLE_CATEGORY_NAME, STICKER_CATEGORY_NAME } from './constants';
-import { buildStickerOuterId, isSkuImportDataRow, normalizeImportRowValues } from './domain';
+import { isSkuImportDataRow, normalizeImportRowValues } from './domain';
 import type { ErpCatalogClient } from './erp-catalog';
 import type { SuiteBridgeEntry } from './erp-item-payload';
 import {
@@ -31,6 +34,8 @@ async function resolveStickerBridgeEntry(
     component?: string;
     standard?: string;
     picPath?: string;
+    itemCatName: string;
+    unit: string;
   },
 ): Promise<SuiteBridgeEntry> {
   const existing = await catalog.buildBridgeEntryForOuterId(stickerCode);
@@ -52,7 +57,8 @@ async function resolveStickerBridgeEntry(
     outerId: stickerCode,
     title: createPayload.title,
     brand: createPayload.brand,
-    itemCatName: STICKER_CATEGORY_NAME,
+    itemCatName: createPayload.itemCatName,
+    unit: createPayload.unit,
     component: createPayload.component,
     standard: createPayload.standard,
     picPath: createPayload.picPath,
@@ -143,7 +149,7 @@ export async function executeSkuImportRows(options: {
     const sourceRow = options.parsed.rows.find((row) => row.rowNumber === previewRow.rowNumber);
     const normalized = normalizeImportRowValues(sourceRow?.values ?? {});
     const bundleOuterId = previewRow.proposedSkuCode;
-    const stickerCode = buildStickerOuterId(bundleOuterId);
+    const stickerCode = previewRow.stickerOuterId;
 
     try {
       const existingBundles = await options.catalog.getItemsByOuterIds([bundleOuterId]);
@@ -180,6 +186,8 @@ export async function executeSkuImportRows(options: {
         component: normalized.component,
         standard: normalized.standard,
         picPath: imageUrl,
+        itemCatName: previewRow.stickerCategory,
+        unit: previewRow.stickerUnit,
       });
 
       const accessoryBridges = await buildAccessoryBridgeEntries(
@@ -198,7 +206,7 @@ export async function executeSkuImportRows(options: {
         outerId: bundleOuterId,
         title: previewRow.bundleTitle,
         brand: previewRow.brand,
-        itemCatName: BUNDLE_CATEGORY_NAME,
+        itemCatName: previewRow.bundleCategory,
         component: normalized.component,
         standard: normalized.standard,
         picPath: imageUrl,
@@ -245,9 +253,7 @@ export async function executeSkuImportRows(options: {
     executeResult: {
       sessionId: options.sessionId,
       filePath: options.filePath,
-      succeededCount: rowResults.filter((row) => row.status === 'succeeded').length,
-      failedCount: rowResults.filter((row) => row.status === 'failed').length,
-      skippedCount: rowResults.filter((row) => row.status === 'skipped_existing').length,
+      ...summarizeSkuImportExecuteRows(rowResults, options.previewRows.length),
       rows: rowResults,
     },
     updatedWorkbook,

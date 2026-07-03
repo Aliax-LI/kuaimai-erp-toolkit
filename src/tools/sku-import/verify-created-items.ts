@@ -1,13 +1,9 @@
 import type { SkuImportPreviewRow } from '@shared/types/sku-import';
 
 import {
-  BUNDLE_CATEGORY_NAME,
   ERP_ITEM_TYPE_NORMAL,
   ERP_ITEM_TYPE_SUITE,
-  STICKER_CATEGORY_NAME,
-  STICKER_UNIT_NAME,
 } from './constants';
-import { buildStickerOuterId } from './domain';
 import type { ErpCatalogClient } from './erp-catalog';
 import { findCatalogItemByOuterId } from './erp-catalog';
 import { resolveErpCategoryId } from './erp-category';
@@ -173,7 +169,7 @@ export async function verifyCreatedSkuImportRow(
 ): Promise<{ ok: boolean; steps: VerifyStep[] }> {
   const steps: VerifyStep[] = [];
   const bundleOuterId = previewRow.proposedSkuCode;
-  const stickerOuterId = buildStickerOuterId(bundleOuterId);
+  const stickerOuterId = previewRow.stickerOuterId;
   const accessoryOuterIds = previewRow.matchedAccessoryCodes;
   const productOriginalOuterId = previewRow.productOriginalOuterId;
 
@@ -203,10 +199,12 @@ export async function verifyCreatedSkuImportRow(
     const unit = String(stickerDetail?.unit ?? '').trim();
     steps.push({
       label: '贴纸单位',
-      ok: unit === STICKER_UNIT_NAME,
+      ok: unit === previewRow.stickerUnit,
       detail: unit ? unit : '(空)',
     });
-    steps.push(await verifyItemCategory(client, '贴纸分类', stickerDetail, STICKER_CATEGORY_NAME));
+    steps.push(
+      await verifyItemCategory(client, '贴纸分类', stickerDetail, previewRow.stickerCategory),
+    );
   }
 
   const bundle = findCatalogItemByOuterId(items, bundleOuterId);
@@ -292,7 +290,7 @@ export async function verifyCreatedSkuImportRow(
     detail: `isSysWeight=${detail.isSysWeight ?? '(空)'} isSysPriceImport=${detail.isSysPriceImport ?? '(空)'}`,
   });
 
-  steps.push(await verifyItemCategory(client, '套装分类', detail, BUNDLE_CATEGORY_NAME));
+  steps.push(await verifyItemCategory(client, '套装分类', detail, previewRow.bundleCategory));
 
   return { ok: steps.every((step) => step.ok), steps };
 }

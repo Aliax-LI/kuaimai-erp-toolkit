@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { SkuImportConfig } from '../src/shared/schemas/sku-import-config';
+import { DEFAULT_SKU_IMPORT_CONFIG } from '../src/shared/schemas/sku-import-config';
 import { buildSkuImportPreview } from '../src/tools/sku-import/preview';
 import type { ErpCatalogClient } from '../src/tools/sku-import/erp-catalog';
 import type { ParsedSkuImportWorkbook } from '../src/tools/sku-import/workbook';
@@ -22,6 +23,7 @@ function mockCatalog(overrides: Partial<ErpCatalogClient>): ErpCatalogClient {
 }
 
 const testConfig: SkuImportConfig = {
+  ...DEFAULT_SKU_IMPORT_CONFIG,
   brands: [{ name: 'WKAU', code: '39', shortName: 'W', enabled: true }],
   accessories: [
     { name: '自粘袋', skuCode: 'PJ-ZND01', brand: 'WKAU', enabled: true },
@@ -30,6 +32,7 @@ const testConfig: SkuImportConfig = {
 };
 
 const configMissingManual: SkuImportConfig = {
+  ...DEFAULT_SKU_IMPORT_CONFIG,
   brands: testConfig.brands,
   accessories: [testConfig.accessories[0]],
 };
@@ -118,6 +121,7 @@ describe('buildSkuImportPreview', () => {
     expect(result.rows[0].matchedAccessorySkus).toHaveLength(2);
     expect(result.rows[0].matchedAccessorySkus[0].skuOuterId).toBe('PJ-ZND01-02');
     expect(result.rows[0].productOriginalOuterId).toBe('YP-BYMPGXJ01');
-    expect(result.rows[0].stickerOuterId).toContain('-ST');
+    expect(result.rows[0].stickerOuterId).toBe('test0628');
+    expect(result.rows[0].proposedSkuCode).toBe('69-wkau-BYMPGXJ-test0628');
   });
 });

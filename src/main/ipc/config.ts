@@ -5,7 +5,9 @@ import type { AppSettings, SecretsRecord } from '@shared/schemas/store';
 import type { ErpConnectionTestInput } from '@shared/types/erp-connection';
 
 import {
+  deleteSecrets,
   getAppSettings,
+  getErpSecrets,
   getSecretsMeta,
   setAppSettings,
   setSecrets,
@@ -32,9 +34,21 @@ export function registerConfigIpc(): void {
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.CONFIG_GET_SECRETS,
+    wrapIpcHandler(IPC_CHANNELS.CONFIG_GET_SECRETS, () => getErpSecrets()),
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.CONFIG_SET_SECRETS,
     wrapIpcHandler(IPC_CHANNELS.CONFIG_SET_SECRETS, (_event, partial: SecretsRecord) =>
       setSecrets(partial),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.CONFIG_DELETE_SECRETS,
+    wrapIpcHandler(IPC_CHANNELS.CONFIG_DELETE_SECRETS, (_event, keys: string[]) =>
+      deleteSecrets(keys),
     ),
   );
 

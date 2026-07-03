@@ -39,7 +39,10 @@ export function previewRowReason(row: SkuImportPreviewRow): string {
   }
   if (row.status === 'skipped_existing') {
     const sku = row.existingSkuCode ?? row.proposedSkuCode;
-    return row.blockedReason ?? (sku ? `ERP 中已存在套装货号 ${sku}` : 'ERP 中已存在套装货号');
+    if (sku) {
+      return `ERP 中已存在套装货号 ${sku}，将跳过创建`;
+    }
+    return row.blockedReason ?? 'ERP 中已存在套装货号，将跳过创建';
   }
   if (row.status === 'pending') {
     if (row.blockedReason) {

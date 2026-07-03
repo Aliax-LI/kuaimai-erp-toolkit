@@ -57,6 +57,7 @@ export interface SkuImportPreviewRow {
   matchedAccessorySkus: MatchedAccessorySku[];
   bundleCategory: string;
   stickerCategory: string;
+  stickerUnit: string;
 }
 
 export interface SkuImportPreviewResult {
@@ -86,6 +87,20 @@ export interface SkuImportExecuteResult {
   failedCount: number;
   skippedCount: number;
   rows: SkuImportExecuteRowResult[];
+}
+
+export function summarizeSkuImportExecuteRows(
+  rows: Pick<SkuImportExecuteRowResult, 'status'>[],
+  totalRows?: number,
+): Pick<SkuImportExecuteResult, 'succeededCount' | 'failedCount' | 'skippedCount'> {
+  const succeededCount = rows.filter((row) => row.status === 'succeeded').length;
+  const effectiveTotal =
+    totalRows !== undefined ? Math.max(totalRows, rows.length) : rows.length;
+  return {
+    succeededCount,
+    failedCount: effectiveTotal - succeededCount,
+    skippedCount: rows.filter((row) => row.status === 'skipped_existing').length,
+  };
 }
 
 export type SkuImportTaskStatus = 'previewed' | 'executing' | 'completed' | 'failed';
