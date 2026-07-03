@@ -6,6 +6,7 @@ import { SegmentedControl } from '@/components/shared/segmented-control';
 import { StatCard } from '@/components/shared/stat-card';
 import { StatusBadge } from '@/components/shared/status-badge';
 import {
+  previewRowBundleCode,
   previewRowReason,
   previewRowStatusTone,
   rowStatusLabel,
@@ -152,6 +153,8 @@ export function SkuImportTaskDetailPanel({ detail }: { detail: SkuImportTaskDeta
               <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">行</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">品牌</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">产品</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">套装货号</th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">贴纸货号</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">状态</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">说明</th>
             </tr>
@@ -162,6 +165,12 @@ export function SkuImportTaskDetailPanel({ detail }: { detail: SkuImportTaskDeta
                 <td className="px-3 py-2 text-brown-soft">{row.rowNumber}</td>
                 <td className="px-3 py-2 font-medium">{row.brand || '—'}</td>
                 <td className="px-3 py-2">{row.productName || row.displayName || '—'}</td>
+                <td className="px-3 py-2 font-mono text-xs text-brown-soft">
+                  {previewRowBundleCode(row)}
+                </td>
+                <td className="px-3 py-2 font-mono text-xs text-brown-soft">
+                  {row.stickerOuterId || '—'}
+                </td>
                 <td className="px-3 py-2">
                   <StatusBadge tone={previewRowStatusTone(row.status)}>
                     {rowStatusLabel(row.status)}

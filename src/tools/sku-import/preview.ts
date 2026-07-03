@@ -112,7 +112,14 @@ export async function buildSkuImportPreview(
     const brandResolved = resolveBrandCodeFromConfig(normalized.brand, importConfig);
     const proposedSkuCode =
       normalized.existingSkuCode ||
-      buildBundleOuterId(rules, normalized.brand, normalized.productCode, normalized.stickerCode);
+      ('code' in brandResolved
+        ? buildBundleOuterId(
+            rules,
+            brandResolved.code,
+            normalized.productName,
+            normalized.stickerCode,
+          )
+        : '');
     const stickerOuterId = normalized.stickerCode;
 
     const existingItems = await catalog.getItemsByOuterIds([proposedSkuCode, stickerOuterId]);
@@ -176,7 +183,7 @@ export async function buildSkuImportPreview(
         proposedSkuCode,
         existingSkuCode: proposedSkuCode,
         status: 'skipped_existing',
-        blockedReason: `ERP 中已存在套装货号 ${proposedSkuCode}，将跳过创建`,
+        blockedReason: 'ERP 中已存在套装货号，将跳过创建',
       });
       continue;
     }

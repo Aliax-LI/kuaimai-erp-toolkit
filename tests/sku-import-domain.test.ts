@@ -6,7 +6,6 @@ import {
   buildBusinessKey,
   buildStickerTitle,
   deriveProductNameInitials,
-  deriveProductShortCode,
   isSkuImportDataRow,
   parseAccessoryNames,
   validateImportRow,
@@ -33,23 +32,13 @@ describe('sku-import domain', () => {
     expect(deriveProductNameInitials('Oil Cleaner')).toBe('OC');
   });
 
-  it('deriveProductShortCode 应从原品编码提取产品简写', () => {
-    expect(deriveProductShortCode('YP-BYMPGXJ01')).toBe('BYMPGXJ');
-    expect(deriveProductShortCode('YP-CJJ01-01')).toBe('CJJ01');
-  });
-
-  it('buildBundleOuterId 应按前缀-品牌-产品简写-贴纸编码生成', () => {
+  it('buildBundleOuterId 应按前缀-品牌编码-产品名首字母+贴纸编码生成', () => {
     expect(
-      buildBundleOuterId(DEFAULT_SKU_IMPORT_RULES, 'WKAU', 'YP-BYMPGXJ01', 'test09590724'),
-    ).toBe('69-wkau-BYMPGXJ-test09590724');
+      buildBundleOuterId(DEFAULT_SKU_IMPORT_RULES, '39', 'test', 'test09590724'),
+    ).toBe('69-39-Ttest09590724');
     expect(
-      buildBundleOuterId(
-        { skuCodePrefix: 'test69' },
-        'wkau',
-        'YP-BYMPGXJ01',
-        'tets09590724',
-      ),
-    ).toBe('test69-wkau-BYMPGXJ-tets09590724');
+      buildBundleOuterId({ skuCodePrefix: 'test69' }, '42', 'Oil Cleaner', 'tets09590724'),
+    ).toBe('test69-42-OCtets09590724');
   });
 
   it('buildBundleTitle 应包含名称列容量包装信息', () => {

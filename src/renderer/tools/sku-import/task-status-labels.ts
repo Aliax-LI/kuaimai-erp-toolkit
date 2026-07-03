@@ -33,22 +33,22 @@ export function previewRowStatusTone(status: SkuImportPreviewRow['status']): Pre
   }
 }
 
+export function previewRowBundleCode(row: SkuImportPreviewRow): string {
+  return (row.existingSkuCode ?? row.proposedSkuCode) || '—';
+}
+
 export function previewRowReason(row: SkuImportPreviewRow): string {
   if (row.status === 'preview_blocked') {
     return row.blockedReason ?? '预演未通过';
   }
   if (row.status === 'skipped_existing') {
-    const sku = row.existingSkuCode ?? row.proposedSkuCode;
-    if (sku) {
-      return `ERP 中已存在套装货号 ${sku}，将跳过创建`;
-    }
-    return row.blockedReason ?? 'ERP 中已存在套装货号，将跳过创建';
+    return 'ERP 中已存在套装货号，将跳过创建';
   }
   if (row.status === 'pending') {
     if (row.blockedReason) {
       return row.blockedReason;
     }
-    return `将创建套装 ${row.proposedSkuCode}`;
+    return '将创建套装';
   }
   return row.blockedReason ?? '—';
 }

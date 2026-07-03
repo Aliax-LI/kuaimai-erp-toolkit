@@ -37,37 +37,22 @@ export function deriveProductNameInitials(productName: string): string {
   return trimmed[0].toUpperCase();
 }
 
-/** 从产品原品编码提取产品简写，如 YP-BYMPGXJ01 → BYMPGXJ */
-export function deriveProductShortCode(productCode: string): string {
-  const primary = productCode.trim().replace(/^YP-/i, '').split('-')[0]?.trim() ?? '';
-  if (!primary) {
-    return '';
-  }
-
-  const versionMatch = primary.match(/^([A-Za-z]{4,})(\d{2})$/);
-  if (versionMatch) {
-    return versionMatch[1].toUpperCase();
-  }
-
-  return primary.toUpperCase();
-}
-
 export function buildStickerOuterId(bundleOuterId: string): string {
   return `${bundleOuterId}-ST`;
 }
 
-/** 套装货号：{前缀}-{品牌}-{产品简写}-{贴纸编码} */
+/** 套装货号：{前缀}-{品牌编码}-{产品名首字母}{贴纸编码} */
 export function buildBundleOuterId(
   rules: Pick<SkuImportRules, 'skuCodePrefix'>,
-  brandName: string,
-  productCode: string,
+  brandCode: string,
+  productName: string,
   stickerCode: string,
 ): string {
   const prefix = rules.skuCodePrefix.trim();
-  const brand = brandName.trim().toLowerCase().replace(/\s+/g, '');
-  const productShort = deriveProductShortCode(productCode);
+  const code = brandCode.replace(/[^A-Z0-9]/gi, '').toUpperCase() || 'BRAND';
+  const initials = deriveProductNameInitials(productName);
   const sticker = stickerCode.trim();
-  return `${prefix}-${brand}-${productShort}-${sticker}`;
+  return `${prefix}-${code}-${initials}${sticker}`;
 }
 
 export function buildStickerTitle(

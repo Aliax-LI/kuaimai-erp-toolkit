@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useSkuImportTasks } from '@/hooks/use-sku-import-tasks';
 import { SkuImportTaskDetailPanel } from '@/tools/sku-import/task-detail-panel';
 import {
+  previewRowBundleCode,
   previewRowReason,
   previewRowStatusTone,
   rowStatusLabel,
@@ -177,6 +178,8 @@ export function WorkbenchPage() {
                     <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">行</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">品牌</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">产品</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">套装货号</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">贴纸货号</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">状态</th>
                     <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">说明</th>
                   </tr>
@@ -190,6 +193,12 @@ export function WorkbenchPage() {
                       <td className="px-3 py-2 text-brown-soft">{row.rowNumber}</td>
                       <td className="px-3 py-2 font-medium">{row.brand || '—'}</td>
                       <td className="px-3 py-2">{row.productName || row.displayName || '—'}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-brown-soft">
+                        {previewRowBundleCode(row)}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs text-brown-soft">
+                        {row.stickerOuterId || '—'}
+                      </td>
                       <td className="px-3 py-2">
                         <StatusBadge tone={previewRowStatusTone(row.status)}>
                           {rowStatusLabel(row.status)}
