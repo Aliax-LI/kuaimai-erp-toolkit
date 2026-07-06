@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { kuaimai } from '@/lib/kuaimai-client';
 import { cn } from '@/lib/utils';
 import { CONFIG_TABS, parseConfigTab, type ConfigTab } from '@shared/constants/navigation';
-import { DEFAULT_ERP_BASE_URL } from '@shared/constants/erp';
+import { DEFAULT_ERP_BASE_URL, DEFAULT_ERP_COMPANY_ID } from '@shared/constants/erp';
 import {
   type AccessoryConfig,
   type BrandConfig,
@@ -21,9 +21,9 @@ import {
 import type { ErpConnectionTestResult } from '@shared/types/erp-connection';
 
 const TAB_META: Record<ConfigTab, { label: string; icon: typeof Tag; description: string }> = {
-  erp: { label: 'ERP 连接', icon: Tag, description: 'Cookie 与 ERP 地址' },
-  brands: { label: '品牌配置', icon: Tag, description: '管理品牌编码与简写' },
-  accessories: { label: '配件配置', icon: Package, description: '管理配件 SKU 编码' },
+  erp: { label: 'ERP 连接', icon: PlugZap, description: '登录凭证与服务地址' },
+  brands: { label: '品牌配置', icon: Tag, description: '品牌名称、编码与简称' },
+  accessories: { label: '配件配置', icon: Package, description: '配件名称与 ERP SKU 编码' },
   rules: { label: '编码规则', icon: Hash, description: '货号生成规则' },
 };
 
@@ -87,7 +87,7 @@ export function ConfigPage() {
     });
     void kuaimai.config.getSecrets().then((secrets) => {
       setErpCookie(secrets.erpCookie);
-      setErpCompanyId(secrets.erpCompanyId);
+      setErpCompanyId(secrets.erpCompanyId || DEFAULT_ERP_COMPANY_ID);
       setErpCookieSet(Boolean(secrets.erpCookie));
       setErpCompanyIdSet(Boolean(secrets.erpCompanyId));
     });
@@ -180,12 +180,11 @@ export function ConfigPage() {
       .filter(
         ({ accessory }) =>
           accessory.name.toLowerCase().includes(q) ||
-          accessory.skuCode.toLowerCase().includes(q) ||
-          accessory.brand.toLowerCase().includes(q),
+          accessory.skuCode.toLowerCase().includes(q),
       );
   }, [accessorySearch, accessories]);
 
-  const commitBrand = () => {
+  const commitBrand = async () => {
     if (!brandDraft) return;
     const value = brandDraft.value;
     if (!value.name.trim() || !value.code.trim()) {
@@ -198,27 +197,47 @@ export function ConfigPage() {
     } else {
       next[brandDraft.index] = value;
     }
-    setBrands(next);
-    setBrandsDirty(true);
-    setBrandDraft(null);
-    setDraftError(null);
+    try {
+      await saveBrands(next);
+      setBrands(next);
+      setBrandsDirty(false);
+      setBrandDraft(null);
+      setDraftError(null);
+      setSaveSuccess(true);
+    } catch (err) {
+      setDraftError(err instanceof Error ? err.message : '保存失败');
+    }
   };
 
-  const removeBrand = (index: number) => {
-    setBrands(brands.filter((_, i) => i !== index));
-    setBrandsDirty(true);
+  const removeBrand = async (index: number) => {
+    const next = brands.filter((_, i) => i !== index);
+    try {
+      await saveBrands(next);
+      setBrands(next);
+      setBrandsDirty(false);
+      setSaveSuccess(true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '保存失败');
+    }
   };
 
-  const toggleBrand = (index: number) => {
-    setBrands(
-      brands.map((brand, i) => (i === index ? { ...brand, enabled: !brand.enabled } : brand)),
+  const toggleBrand = async (index: number) => {
+    const next = brands.map((brand, i) =>
+      i === index ? { ...brand, enabled: !brand.enabled } : brand,
     );
-    setBrandsDirty(true);
+    try {
+      await saveBrands(next);
+      setBrands(next);
+      setBrandsDirty(false);
+      setSaveSuccess(true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '保存失败');
+    }
   };
 
-  const commitAccessory = () => {
+  const commitAccessory = async () => {
     if (!accessoryDraft) return;
-    const value = accessoryDraft.value;
+    const value = { ...accessoryDraft.value, brand: '' };
     if (!value.name.trim() || !value.skuCode.trim()) {
       setDraftError('配件名称与 SKU 编码不能为空');
       return;
@@ -229,24 +248,42 @@ export function ConfigPage() {
     } else {
       next[accessoryDraft.index] = value;
     }
-    setAccessories(next);
-    setAccessoriesDirty(true);
-    setAccessoryDraft(null);
-    setDraftError(null);
+    try {
+      await saveAccessories(next);
+      setAccessories(next);
+      setAccessoriesDirty(false);
+      setAccessoryDraft(null);
+      setDraftError(null);
+      setSaveSuccess(true);
+    } catch (err) {
+      setDraftError(err instanceof Error ? err.message : '保存失败');
+    }
   };
 
-  const removeAccessory = (index: number) => {
-    setAccessories(accessories.filter((_, i) => i !== index));
-    setAccessoriesDirty(true);
+  const removeAccessory = async (index: number) => {
+    const next = accessories.filter((_, i) => i !== index);
+    try {
+      await saveAccessories(next);
+      setAccessories(next);
+      setAccessoriesDirty(false);
+      setSaveSuccess(true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '保存失败');
+    }
   };
 
-  const toggleAccessory = (index: number) => {
-    setAccessories(
-      accessories.map((accessory, i) =>
-        i === index ? { ...accessory, enabled: !accessory.enabled } : accessory,
-      ),
+  const toggleAccessory = async (index: number) => {
+    const next = accessories.map((accessory, i) =>
+      i === index ? { ...accessory, enabled: !accessory.enabled } : accessory,
     );
-    setAccessoriesDirty(true);
+    try {
+      await saveAccessories(next);
+      setAccessories(next);
+      setAccessoriesDirty(false);
+      setSaveSuccess(true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '保存失败');
+    }
   };
 
   const handleSaveBrands = async () => {
@@ -291,7 +328,7 @@ export function ConfigPage() {
       setErpCompanyIdSet(false);
     }
     window.dispatchEvent(new Event(SECRETS_UPDATED_EVENT));
-    toast(key === 'erpCookie' ? 'Cookie 已清除' : 'companyId 已清除');
+    toast(key === 'erpCookie' ? 'Cookie 已清除' : '公司ID 已清除');
   };
 
   const commitRule = async () => {
@@ -312,8 +349,8 @@ export function ConfigPage() {
   };
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="min-w-0 w-full space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-medium text-charcoal">配置管理</h2>
           <p className="mt-1 text-sm text-brown-soft">{TAB_META[tab].description}</p>
@@ -369,35 +406,40 @@ export function ConfigPage() {
         )}
       </div>
 
-      <div className="flex w-fit items-center gap-1 rounded-lg bg-cream-warm p-0.5">
-        {CONFIG_TABS.map((item) => {
-          const meta = TAB_META[item];
-          const Icon = meta.icon;
-          return (
-            <button
-              key={item}
-              type="button"
-              className={cn(
-                'flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all',
-                tab === item ? 'bg-charcoal text-cream' : 'text-brown-soft hover:text-charcoal',
-              )}
-              onClick={() => setTab(item)}
-            >
-              <Icon className="h-4 w-4" />
-              {meta.label}
-            </button>
-          );
-        })}
+      <div className="overflow-x-auto scrollbar-thin">
+        <div className="flex w-max min-w-full items-center gap-1 rounded-md border border-beige bg-cream-warm p-0.5">
+          {CONFIG_TABS.map((item) => {
+            const meta = TAB_META[item];
+            const Icon = meta.icon;
+            return (
+              <button
+                key={item}
+                type="button"
+                className={cn(
+                  'flex shrink-0 items-center gap-2 rounded px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+                  tab === item ? 'bg-charcoal text-cream' : 'text-brown-soft hover:text-charcoal',
+                )}
+                onClick={() => setTab(item)}
+              >
+                <Icon className="h-4 w-4" />
+                {meta.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {tab === 'erp' && (
-        <div className="space-y-4 rounded-xl border border-beige bg-cream-white p-5 shadow-sm">
+        <div className="space-y-4 border border-beige bg-cream-white p-5">
+          <p className="text-sm text-brown-soft">
+            从浏览器开发者工具复制登录 Cookie 和公司ID，保存后可在顶栏查看连接状态。
+          </p>
           <div className="flex flex-wrap gap-2">
             <StatusBadge tone={erpCookieSet ? 'success' : 'neutral'}>
               Cookie {erpCookieSet ? '已配置' : '未配置'}
             </StatusBadge>
             <StatusBadge tone={erpCompanyIdSet ? 'success' : 'neutral'}>
-              companyId {erpCompanyIdSet ? '已配置' : '未配置'}
+              公司ID {erpCompanyIdSet ? '已配置' : '未配置'}
             </StatusBadge>
           </div>
           <label className="block space-y-1">
@@ -415,15 +457,16 @@ export function ConfigPage() {
               )}
             </div>
             <Input
-              placeholder="从浏览器复制登录 Cookie"
+              placeholder="从浏览器 Network 面板复制完整 Cookie 字符串"
               value={erpCookie}
               onChange={(event) => setErpCookie(event.target.value)}
               autoComplete="off"
             />
+            <p className="text-xs text-brown-soft">登录 ERP 后，在任意请求的 Request Headers 中复制 Cookie</p>
           </label>
           <label className="block space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-charcoal">companyId</span>
+              <span className="text-sm font-medium text-charcoal">公司ID</span>
               {erpCompanyIdSet && (
                 <button
                   type="button"
@@ -436,11 +479,12 @@ export function ConfigPage() {
               )}
             </div>
             <Input
-              placeholder="140109（Network 请求头 companyid）"
+              placeholder="例如 140109"
               value={erpCompanyId}
               onChange={(event) => setErpCompanyId(event.target.value)}
               autoComplete="off"
             />
+            <p className="text-xs text-brown-soft">请求头中的 companyId 字段，通常为 6 位数字</p>
           </label>
           <label className="block space-y-1">
             <span className="text-sm font-medium text-charcoal">ERP 地址</span>
@@ -449,15 +493,19 @@ export function ConfigPage() {
               onChange={(event) => setErpBaseUrl(event.target.value)}
               autoComplete="off"
             />
+            <p className="text-xs text-brown-soft">默认 https://erp.superboss.cc，一般无需修改</p>
           </label>
           {testResult && (
-            <p
-              className={
-                testResult.ok ? 'text-sm text-status-success' : 'text-sm text-status-danger'
-              }
+            <div
+              className={cn(
+                'border px-3 py-2.5 text-sm',
+                testResult.ok
+                  ? 'border-status-success/20 bg-status-success/5 text-status-success'
+                  : 'border-status-danger/20 bg-status-danger/5 text-status-danger',
+              )}
             >
               {testResult.message}
-            </p>
+            </div>
           )}
         </div>
       )}
@@ -486,25 +534,26 @@ export function ConfigPage() {
               新增品牌
             </Button>
           </div>
-          <div className="overflow-hidden rounded-xl border border-beige bg-cream-white shadow-sm">
-            <table className="w-full text-sm">
+          <div className="overflow-hidden border border-beige bg-cream-white">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full min-w-[40rem] table-fixed text-sm">
               <thead>
                 <tr className="border-b border-beige bg-cream/50">
-                  <th className="px-4 py-3 text-left font-medium text-brown-soft">品牌名称</th>
-                  <th className="px-4 py-3 text-left font-medium text-brown-soft">品牌编码</th>
-                  <th className="px-4 py-3 text-left font-medium text-brown-soft">名称简写</th>
-                  <th className="px-4 py-3 text-left font-medium text-brown-soft">状态</th>
-                  <th className="px-4 py-3 text-left font-medium text-brown-soft">操作</th>
+                  <th className="w-[28%] px-4 py-3 text-left font-medium text-brown-soft">品牌名称</th>
+                  <th className="w-[20%] px-4 py-3 text-left font-medium text-brown-soft">品牌编码</th>
+                  <th className="w-[20%] px-4 py-3 text-left font-medium text-brown-soft">名称简写</th>
+                  <th className="w-[14%] px-4 py-3 text-left font-medium text-brown-soft">状态</th>
+                  <th className="w-[18%] px-4 py-3 text-left font-medium text-brown-soft">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredBrands.map(({ brand, index }) => (
                   <tr key={index} className="border-b border-beige/50 hover:bg-cream-warm/30">
-                    <td className="px-4 py-3 font-medium">{brand.name}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{brand.code}</td>
-                    <td className="px-4 py-3">{brand.shortName || '—'}</td>
+                    <td className="truncate px-4 py-3 font-medium">{brand.name}</td>
+                    <td className="truncate px-4 py-3 font-mono text-xs">{brand.code}</td>
+                    <td className="truncate px-4 py-3">{brand.shortName || '—'}</td>
                     <td className="px-4 py-3">
-                      <button type="button" onClick={() => toggleBrand(index)}>
+                      <button type="button" onClick={() => void toggleBrand(index)}>
                         <StatusBadge tone={brand.enabled ? 'success' : 'neutral'}>
                           {brand.enabled ? '启用' : '停用'}
                         </StatusBadge>
@@ -525,7 +574,7 @@ export function ConfigPage() {
                         <button
                           type="button"
                           className="text-brown-soft transition-colors hover:text-status-danger"
-                          onClick={() => removeBrand(index)}
+                          onClick={() => void removeBrand(index)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -535,8 +584,16 @@ export function ConfigPage() {
                 ))}
               </tbody>
             </table>
+            </div>
             {!loading && filteredBrands.length === 0 && (
-              <div className="py-12 text-center text-brown-soft">暂无品牌，点击「新增品牌」添加</div>
+              <div className="py-12 text-center">
+                <p className="text-brown-soft">
+                  {brandSearch.trim() ? '未找到匹配的品牌' : '暂无品牌配置'}
+                </p>
+                {!brandSearch.trim() && (
+                  <p className="mt-1 text-xs text-brown-soft">点击右上角「新增品牌」开始添加</p>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -566,25 +623,24 @@ export function ConfigPage() {
               新增配件
             </Button>
           </div>
-          <div className="overflow-hidden rounded-xl border border-beige bg-cream-white shadow-sm">
-            <table className="w-full text-sm">
+          <div className="overflow-hidden border border-beige bg-cream-white">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full min-w-[32rem] table-fixed text-sm">
               <thead>
                 <tr className="border-b border-beige bg-cream/50">
-                  <th className="px-4 py-3 text-left font-medium text-brown-soft">配件名称</th>
-                  <th className="px-4 py-3 text-left font-medium text-brown-soft">SKU 编码</th>
-                  <th className="px-4 py-3 text-left font-medium text-brown-soft">所属品牌</th>
-                  <th className="px-4 py-3 text-left font-medium text-brown-soft">状态</th>
-                  <th className="px-4 py-3 text-left font-medium text-brown-soft">操作</th>
+                  <th className="w-[36%] px-4 py-3 text-left font-medium text-brown-soft">配件名称</th>
+                  <th className="w-[36%] px-4 py-3 text-left font-medium text-brown-soft">SKU 编码</th>
+                  <th className="w-[14%] px-4 py-3 text-left font-medium text-brown-soft">状态</th>
+                  <th className="w-[14%] px-4 py-3 text-left font-medium text-brown-soft">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAccessories.map(({ accessory, index }) => (
                   <tr key={index} className="border-b border-beige/50 hover:bg-cream-warm/30">
-                    <td className="px-4 py-3 font-medium">{accessory.name}</td>
-                    <td className="px-4 py-3 font-mono text-xs">{accessory.skuCode}</td>
-                    <td className="px-4 py-3">{accessory.brand || '—'}</td>
+                    <td className="truncate px-4 py-3 font-medium">{accessory.name}</td>
+                    <td className="truncate px-4 py-3 font-mono text-xs">{accessory.skuCode}</td>
                     <td className="px-4 py-3">
-                      <button type="button" onClick={() => toggleAccessory(index)}>
+                      <button type="button" onClick={() => void toggleAccessory(index)}>
                         <StatusBadge tone={accessory.enabled ? 'success' : 'neutral'}>
                           {accessory.enabled ? '启用' : '停用'}
                         </StatusBadge>
@@ -605,7 +661,7 @@ export function ConfigPage() {
                         <button
                           type="button"
                           className="text-brown-soft transition-colors hover:text-status-danger"
-                          onClick={() => removeAccessory(index)}
+                          onClick={() => void removeAccessory(index)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -615,28 +671,37 @@ export function ConfigPage() {
                 ))}
               </tbody>
             </table>
+            </div>
             {!loading && filteredAccessories.length === 0 && (
-              <div className="py-12 text-center text-brown-soft">暂无配件，点击「新增配件」添加</div>
+              <div className="py-12 text-center">
+                <p className="text-brown-soft">
+                  {accessorySearch.trim() ? '未找到匹配的配件' : '暂无配件配置'}
+                </p>
+                {!accessorySearch.trim() && (
+                  <p className="mt-1 text-xs text-brown-soft">可在工作台导入时快速补全，或在此手动添加</p>
+                )}
+              </div>
             )}
           </div>
         </div>
       )}
 
       {tab === 'rules' && (
-        <div className="overflow-hidden rounded-xl border border-beige bg-cream-white shadow-sm">
-          <table className="w-full text-sm">
+        <div className="overflow-hidden border border-beige bg-cream-white">
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full min-w-[24rem] table-fixed text-sm">
             <thead>
               <tr className="border-b border-beige bg-cream/50">
-                <th className="px-4 py-3 text-left font-medium text-brown-soft">规则项</th>
-                <th className="px-4 py-3 text-left font-medium text-brown-soft">当前值</th>
-                <th className="px-4 py-3 text-left font-medium text-brown-soft">操作</th>
+                <th className="w-[24%] px-4 py-3 text-left font-medium text-brown-soft">规则项</th>
+                <th className="w-[56%] px-4 py-3 text-left font-medium text-brown-soft">当前值</th>
+                <th className="w-[20%] px-4 py-3 text-left font-medium text-brown-soft">操作</th>
               </tr>
             </thead>
             <tbody>
               {RULE_FIELDS.map(({ key, label }) => (
                 <tr key={key} className="border-b border-beige/50 hover:bg-cream-warm/30">
                   <td className="px-4 py-3 font-medium">{label}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{config.rules[key] || '—'}</td>
+                  <td className="truncate px-4 py-3 font-mono text-xs">{config.rules[key] || '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <button
@@ -663,6 +728,7 @@ export function ConfigPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -739,8 +805,8 @@ export function ConfigPage() {
               >
                 取消
               </Button>
-              <Button onClick={commitBrand} disabled={catalogSaving}>
-                确定
+              <Button onClick={() => void commitBrand()} disabled={catalogSaving}>
+                {catalogSaving ? '保存中…' : '保存'}
               </Button>
             </div>
           </div>
@@ -757,6 +823,9 @@ export function ConfigPage() {
       >
         {accessoryDraft && (
           <div className="space-y-4">
+            {accessoryDraft.index === null && (
+              <p className="text-sm text-brown-soft">配件名称需与 Excel 中一致，SKU 编码为 ERP 中的货号。</p>
+            )}
             <label className="block space-y-1">
               <span className="text-sm font-medium text-charcoal">配件名称</span>
               <Input
@@ -783,19 +852,6 @@ export function ConfigPage() {
                 placeholder="例如 BSG01"
               />
             </label>
-            <label className="block space-y-1">
-              <span className="text-sm font-medium text-charcoal">所属品牌</span>
-              <Input
-                value={accessoryDraft.value.brand}
-                onChange={(event) =>
-                  setAccessoryDraft({
-                    ...accessoryDraft,
-                    value: { ...accessoryDraft.value, brand: event.target.value },
-                  })
-                }
-                placeholder="例如 wkau（可留空）"
-              />
-            </label>
             <label className="flex items-center gap-2 text-sm text-charcoal">
               <input
                 type="checkbox"
@@ -820,8 +876,8 @@ export function ConfigPage() {
               >
                 取消
               </Button>
-              <Button onClick={commitAccessory} disabled={catalogSaving}>
-                确定
+              <Button onClick={() => void commitAccessory()} disabled={catalogSaving}>
+                {catalogSaving ? '保存中…' : '保存'}
               </Button>
             </div>
           </div>

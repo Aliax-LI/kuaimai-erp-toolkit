@@ -70,7 +70,7 @@ export function SkuImportTaskDetailPanel({ detail }: { detail: SkuImportTaskDeta
     const summary = summarizeSkuImportExecuteRows(executeResult.rows, detail.totalRows);
 
     return (
-      <div className="space-y-4 bg-cream/40 p-4">
+      <div className="min-w-0 space-y-4 bg-cream/40 p-4">
         <div className="grid grid-cols-3 gap-3">
           <StatCard
             label="成功"
@@ -91,34 +91,34 @@ export function SkuImportTaskDetailPanel({ detail }: { detail: SkuImportTaskDeta
           onChange={setFilter}
         />
 
-        <div className="max-h-72 overflow-y-auto rounded-lg border border-beige bg-cream scrollbar-thin">
-          <table className="w-full text-sm">
+        <div className="max-h-72 overflow-x-auto overflow-y-auto border border-beige bg-cream scrollbar-thin">
+          <table className="w-full min-w-[56rem] table-fixed text-sm">
             <thead>
               <tr className="border-b border-beige bg-cream/50">
-                <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">行</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">品牌</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">产品</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">贴纸货号</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">套装货号</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">状态</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">说明</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">操作</th>
+                <th className="w-12 px-3 py-2 text-left text-xs font-medium text-brown-soft">行</th>
+                <th className="w-[9%] px-3 py-2 text-left text-xs font-medium text-brown-soft">品牌</th>
+                <th className="w-[16%] px-3 py-2 text-left text-xs font-medium text-brown-soft">产品</th>
+                <th className="w-[14%] px-3 py-2 text-left text-xs font-medium text-brown-soft">贴纸货号</th>
+                <th className="w-[14%] px-3 py-2 text-left text-xs font-medium text-brown-soft">套装货号</th>
+                <th className="w-[10%] px-3 py-2 text-left text-xs font-medium text-brown-soft">状态</th>
+                <th className="w-[22%] px-3 py-2 text-left text-xs font-medium text-brown-soft">说明</th>
+                <th className="w-[10%] px-3 py-2 text-left text-xs font-medium text-brown-soft">操作</th>
               </tr>
             </thead>
             <tbody>
               {executeRows.map((row) => (
                 <tr key={row.rowNumber} className="border-b border-beige/50 hover:bg-cream-warm/30">
                   <td className="px-3 py-2 text-brown-soft">{row.rowNumber}</td>
-                  <td className="px-3 py-2 font-medium">{row.brand}</td>
-                  <td className="px-3 py-2">{row.productName}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-brown-soft">{row.stickerCode}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-brown-soft">{row.bundleCode}</td>
+                  <td className="truncate px-3 py-2 font-medium">{row.brand}</td>
+                  <td className="truncate px-3 py-2">{row.productName}</td>
+                  <td className="truncate px-3 py-2 font-mono text-xs text-brown-soft">{row.stickerCode}</td>
+                  <td className="truncate px-3 py-2 font-mono text-xs text-brown-soft">{row.bundleCode}</td>
                   <td className="px-3 py-2">
                     <StatusBadge tone={executeRowStatusTone(row.status)}>
                       {rowStatusLabel(row.status)}
                     </StatusBadge>
                   </td>
-                  <td className="px-3 py-2 text-xs text-brown-soft">{row.detailText}</td>
+                  <td className="truncate px-3 py-2 text-xs text-brown-soft">{row.detailText}</td>
                   <td className="px-3 py-2">
                     <CopyButton text={row.stickerCode} />
                   </td>
@@ -137,25 +137,25 @@ export function SkuImportTaskDetailPanel({ detail }: { detail: SkuImportTaskDeta
   }
 
   return (
-    <div className="space-y-4 bg-cream/40 p-4">
+    <div className="min-w-0 space-y-4 bg-cream/40 p-4">
       <p className="text-sm text-brown-soft">
-        可执行 {detail.readyCount} 条
-        {detail.blockedCount > 0 && ` · 阻断 ${detail.blockedCount} 条`}
-        {detail.skippedCount > 0 && ` · 跳过 ${detail.skippedCount} 条`}
+        可创建 {detail.readyCount} 条
+        {detail.blockedCount > 0 && ` · 待修复 ${detail.blockedCount} 条`}
+        {detail.skippedCount > 0 && ` · 将跳过 ${detail.skippedCount} 条`}
         {' · '}共 {detail.totalRows} 行
         {detail.status === 'previewed' && ' · 尚未执行创建'}
       </p>
 
-      <div className="max-h-72 overflow-y-auto rounded-lg border border-beige bg-cream scrollbar-thin">
-        <table className="w-full text-sm">
+      <div className="max-h-72 overflow-x-auto overflow-y-auto border border-beige bg-cream scrollbar-thin">
+        <table className="w-full min-w-[48rem] table-fixed text-sm">
           <thead>
             <tr className="border-b border-beige bg-cream/50">
-              <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">行</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">品牌</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">产品</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">套装货号</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">贴纸货号</th>
-              <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">状态</th>
+              <th className="w-12 px-3 py-2 text-left text-xs font-medium text-brown-soft">行</th>
+              <th className="w-[10%] px-3 py-2 text-left text-xs font-medium text-brown-soft">品牌</th>
+              <th className="w-[18%] px-3 py-2 text-left text-xs font-medium text-brown-soft">产品</th>
+              <th className="w-[14%] px-3 py-2 text-left text-xs font-medium text-brown-soft">套装货号</th>
+              <th className="w-[14%] px-3 py-2 text-left text-xs font-medium text-brown-soft">贴纸货号</th>
+              <th className="w-[10%] px-3 py-2 text-left text-xs font-medium text-brown-soft">状态</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-brown-soft">说明</th>
             </tr>
           </thead>
@@ -163,8 +163,8 @@ export function SkuImportTaskDetailPanel({ detail }: { detail: SkuImportTaskDeta
             {detail.preview.rows.map((row) => (
               <tr key={row.rowNumber} className="border-b border-beige/50 hover:bg-cream-warm/30">
                 <td className="px-3 py-2 text-brown-soft">{row.rowNumber}</td>
-                <td className="px-3 py-2 font-medium">{row.brand || '—'}</td>
-                <td className="px-3 py-2">{row.productName || row.displayName || '—'}</td>
+                <td className="truncate px-3 py-2 font-medium">{row.brand || '—'}</td>
+                <td className="truncate px-3 py-2">{row.productName || row.displayName || '—'}</td>
                 <td className="px-3 py-2 font-mono text-xs text-brown-soft">
                   {previewRowBundleCode(row)}
                 </td>
@@ -176,7 +176,7 @@ export function SkuImportTaskDetailPanel({ detail }: { detail: SkuImportTaskDeta
                     {rowStatusLabel(row.status)}
                   </StatusBadge>
                 </td>
-                <td className="px-3 py-2 text-xs text-brown-soft">{previewRowReason(row)}</td>
+                <td className="truncate px-3 py-2 text-xs text-brown-soft">{previewRowReason(row)}</td>
               </tr>
             ))}
           </tbody>

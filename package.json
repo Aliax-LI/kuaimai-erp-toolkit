@@ -1,6 +1,6 @@
 {
   "name": "kuaimai-erp-toolkit",
-  "productName": "快麦 ERP 工具箱",
+  "productName": "快麦小工具",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.11.0",
@@ -51,6 +51,7 @@
     "framer-motion": "^12.42.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.475.0",
+    "pinyin-pro": "^3.28.1",
     "png-to-ico": "^2.1.8",
     "png2icons": "^2.0.1",
     "proxy-agent": "^5.0.0",
@@ -68,7 +69,7 @@
   },
   "build": {
     "appId": "com.kuaimai.erp-toolkit",
-    "productName": "快麦 ERP 工具箱",
+    "productName": "快麦小工具",
     "publish": null,
     "directories": {
       "output": "out/make",

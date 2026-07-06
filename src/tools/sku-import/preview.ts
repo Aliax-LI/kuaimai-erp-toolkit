@@ -1,5 +1,10 @@
 import type { MatchedAccessorySku } from '@shared/types/sku-import';
-import type { SkuImportPreviewRow, SkuImportPreviewResult } from '@shared/types/sku-import';
+import type {
+  SkuImportPreviewProgress,
+  SkuImportPreviewProgressHandler,
+  SkuImportPreviewRow,
+  SkuImportPreviewResult,
+} from '@shared/types/sku-import';
 import type { SkuImportConfig } from '@shared/schemas/sku-import-config';
 import { resolveSkuImportRules } from '@shared/schemas/sku-import-config';
 
@@ -14,11 +19,61 @@ import {
   parseAccessoryNames,
   validateImportRow,
 } from './domain';
-import type { ErpCatalogClient } from './erp-catalog';
+import {
+  findCatalogItemByOuterId,
+  type ErpCatalogClient,
+  type ErpCatalogItem,
+} from './erp-catalog';
 import type { ParsedSkuImportWorkbook } from './workbook';
 
+type BridgeEntryResult = Awaited<ReturnType<ErpCatalogClient['buildBridgeEntryForOuterId']>>;
+
+interface BuildSkuImportPreviewOptions {
+  onProgress?: SkuImportPreviewProgressHandler;
+}
+
+interface PreviewCatalogCache {
+  getItemsByOuterIds(outerIds: string[]): Promise<ErpCatalogItem[]>;
+  buildBridgeEntryForOuterId(outerId: string): Promise<BridgeEntryResult>;
+}
+
+function createPreviewCatalogCache(catalog: ErpCatalogClient): PreviewCatalogCache {
+  const itemCache = new Map<string, Promise<ErpCatalogItem | null>>();
+  const bridgeCache = new Map<string, Promise<BridgeEntryResult>>();
+
+  const normalize = (value: string): string => value.trim();
+
+  return {
+    async getItemsByOuterIds(outerIds: string[]): Promise<ErpCatalogItem[]> {
+      const unique = [...new Set(outerIds.map(normalize).filter(Boolean))];
+      const missing = unique.filter((outerId) => !itemCache.has(outerId));
+
+      if (missing.length > 0) {
+        const batchLookup = catalog.getItemsByOuterIds(missing);
+        for (const outerId of missing) {
+          itemCache.set(
+            outerId,
+            batchLookup.then((items) => findCatalogItemByOuterId(items, outerId) ?? null),
+          );
+        }
+      }
+
+      const items = await Promise.all(unique.map((outerId) => itemCache.get(outerId)!));
+      return items.filter((item): item is ErpCatalogItem => item !== null);
+    },
+
+    buildBridgeEntryForOuterId(outerId: string): Promise<BridgeEntryResult> {
+      const normalized = normalize(outerId);
+      if (!bridgeCache.has(normalized)) {
+        bridgeCache.set(normalized, catalog.buildBridgeEntryForOuterId(normalized));
+      }
+      return bridgeCache.get(normalized)!;
+    },
+  };
+}
+
 async function resolveMatchedAccessorySkus(
-  catalog: ErpCatalogClient,
+  catalog: PreviewCatalogCache,
   configMatches: Array<{ name: string; skuCode: string }>,
 ): Promise<{ matched: MatchedAccessorySku[]; missing: string[] }> {
   const matched: MatchedAccessorySku[] = [];
@@ -98,17 +153,25 @@ export async function buildSkuImportPreview(
   parsed: ParsedSkuImportWorkbook,
   catalog: ErpCatalogClient,
   importConfig: SkuImportConfig,
+  options: BuildSkuImportPreviewOptions = {},
 ): Promise<SkuImportPreviewResult> {
   const rows: SkuImportPreviewRow[] = [];
   const rules = resolveSkuImportRules(importConfig);
-
-  for (const row of parsed.rows) {
+  const catalogCache = createPreviewCatalogCache(catalog);
+  const emitProgress = (progress: SkuImportPreviewProgress) => {
+    options.onProgress?.({
+      taskId: sessionId,
+      filePath,
+      ...progress,
+      percent: Math.max(0, Math.min(100, Math.round(progress.percent))),
+    });
+  };
+  const rowContexts = parsed.rows.map((row) => {
     const validationError = validateImportRow(row.values);
     const normalized = normalizeImportRowValues(row.values);
     const accessories = parseAccessoryNames(normalized.accessoriesRaw);
     const businessKey = buildBusinessKey(row.values);
     const productOriginalOuterId = normalized.productCode;
-
     const brandResolved = resolveBrandCodeFromConfig(normalized.brand, importConfig);
     const proposedSkuCode =
       normalized.existingSkuCode ||
@@ -121,17 +184,80 @@ export async function buildSkuImportPreview(
           )
         : '');
     const stickerOuterId = normalized.stickerCode;
-
-    const existingItems = await catalog.getItemsByOuterIds([proposedSkuCode, stickerOuterId]);
-    const existingOuterIds = new Set(existingItems.map((item) => item.outerId));
-    const bundleExists = existingOuterIds.has(proposedSkuCode);
-    const stickerExists = existingOuterIds.has(stickerOuterId);
-
     const configAccessoryMatch = matchAccessoriesFromConfig(
       accessories,
       normalized.brand,
       importConfig,
     );
+
+    return {
+      row,
+      validationError,
+      normalized,
+      accessories,
+      businessKey,
+      productOriginalOuterId,
+      brandResolved,
+      proposedSkuCode,
+      stickerOuterId,
+      configAccessoryMatch,
+    };
+  });
+
+  emitProgress({
+    stage: 'erp_lookup',
+    percent: 35,
+    message: `准备查询 ERP 基础数据，共 ${rowContexts.length} 行`,
+    currentRows: 0,
+    totalRows: rowContexts.length,
+  });
+  await catalogCache.getItemsByOuterIds(
+    rowContexts.flatMap((context) => {
+      if (context.validationError || 'error' in context.brandResolved) {
+        return [];
+      }
+      return [
+        context.proposedSkuCode,
+        context.stickerOuterId,
+        context.productOriginalOuterId,
+        ...context.configAccessoryMatch.matched.map((item) => item.skuCode),
+      ];
+    }),
+  );
+  emitProgress({
+    stage: 'matching',
+    percent: rowContexts.length > 0 ? 65 : 90,
+    message: rowContexts.length > 0 ? '开始匹配品牌、贴纸和配件' : 'Excel 中没有可预演行',
+    currentRows: 0,
+    totalRows: rowContexts.length,
+  });
+  const emitRowProgress = (index: number) => {
+    const currentRows = index + 1;
+    emitProgress({
+      stage: 'matching',
+      percent: 65 + (currentRows / Math.max(rowContexts.length, 1)) * 30,
+      message: `正在匹配第 ${currentRows} / ${rowContexts.length} 行`,
+      currentRows,
+      totalRows: rowContexts.length,
+    });
+  };
+
+  for (const [index, context] of rowContexts.entries()) {
+    const {
+      row,
+      validationError,
+      normalized,
+      accessories,
+      businessKey,
+      productOriginalOuterId,
+      brandResolved,
+      proposedSkuCode,
+      stickerOuterId,
+      configAccessoryMatch,
+    } = context;
+
+    let bundleExists = false;
+    let stickerExists = false;
 
     const base = previewRowBase({
       rowNumber: row.rowNumber,
@@ -155,6 +281,7 @@ export async function buildSkuImportPreview(
         status: 'preview_blocked',
         blockedReason: validationError,
       });
+      emitRowProgress(index);
       continue;
     }
 
@@ -164,16 +291,23 @@ export async function buildSkuImportPreview(
         status: 'preview_blocked',
         blockedReason: brandResolved.error,
       });
+      emitRowProgress(index);
       continue;
     }
 
-    const productOriginalItems = await catalog.getItemsByOuterIds([productOriginalOuterId]);
+    const existingItems = await catalogCache.getItemsByOuterIds([proposedSkuCode, stickerOuterId]);
+    const existingOuterIds = new Set(existingItems.map((item) => item.outerId));
+    bundleExists = existingOuterIds.has(proposedSkuCode);
+    stickerExists = existingOuterIds.has(stickerOuterId);
+
+    const productOriginalItems = await catalogCache.getItemsByOuterIds([productOriginalOuterId]);
     if (!productOriginalItems[0]?.outerId) {
       rows.push({
         ...base,
         status: 'preview_blocked',
         blockedReason: `产品原品「${productOriginalOuterId}」在 ERP 中不存在`,
       });
+      emitRowProgress(index);
       continue;
     }
 
@@ -185,6 +319,7 @@ export async function buildSkuImportPreview(
         status: 'skipped_existing',
         blockedReason: 'ERP 中已存在套装货号，将跳过创建',
       });
+      emitRowProgress(index);
       continue;
     }
 
@@ -194,11 +329,12 @@ export async function buildSkuImportPreview(
         status: 'preview_blocked',
         blockedReason: `未匹配配件: ${configAccessoryMatch.missing.join('、')}`,
       });
+      emitRowProgress(index);
       continue;
     }
 
     const { matched: matchedAccessorySkus, missing: erpAccessoryMissing } =
-      await resolveMatchedAccessorySkus(catalog, configAccessoryMatch.matched);
+      await resolveMatchedAccessorySkus(catalogCache, configAccessoryMatch.matched);
 
     if (erpAccessoryMissing.length > 0) {
       rows.push({
@@ -206,6 +342,7 @@ export async function buildSkuImportPreview(
         status: 'preview_blocked',
         blockedReason: erpAccessoryMissing.join('、'),
       });
+      emitRowProgress(index);
       continue;
     }
 
@@ -219,6 +356,7 @@ export async function buildSkuImportPreview(
           ? `贴纸货号 ${stickerOuterId} 已存在，执行时将复用`
           : undefined,
     });
+    emitRowProgress(index);
   }
 
   return {

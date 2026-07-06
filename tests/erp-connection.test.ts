@@ -11,7 +11,7 @@ describe('testErpConnection', () => {
   it('缺少 companyId 时应返回失败', async () => {
     const result = await testErpConnection();
     expect(result.ok).toBe(false);
-    expect(result.message).toContain('companyId');
+    expect(result.message).toContain('公司ID');
   });
 
   it('传入表单 companyId 时应使用表单值', async () => {

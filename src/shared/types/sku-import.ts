@@ -1,4 +1,4 @@
-export const SKU_IMPORT_SHEET_NAME = '待创建货号记录' as const;
+export const SKU_IMPORT_SHEET_NAME = 'sheet1' as const;
 
 export const SKU_IMPORT_RESULT_COLUMNS = {
   skuCode: '商品SKU货号',
@@ -70,6 +70,49 @@ export interface SkuImportPreviewResult {
   skippedCount: number;
   rows: SkuImportPreviewRow[];
 }
+
+export type SkuImportPreviewProgressStage =
+  | 'reading'
+  | 'parsing'
+  | 'config'
+  | 'erp_lookup'
+  | 'matching'
+  | 'saving'
+  | 'done';
+
+export interface SkuImportPreviewProgress {
+  stage: SkuImportPreviewProgressStage;
+  percent: number;
+  message: string;
+  taskId?: string;
+  filePath?: string;
+  currentRows?: number;
+  totalRows?: number;
+}
+
+export type SkuImportPreviewProgressHandler = (progress: SkuImportPreviewProgress) => void;
+
+export type SkuImportExecuteProgressStage =
+  | 'preparing'
+  | 'executing'
+  | 'writeback'
+  | 'verifying'
+  | 'done';
+
+export interface SkuImportExecuteProgress {
+  stage: SkuImportExecuteProgressStage;
+  percent: number;
+  message: string;
+  taskId: string;
+  filePath?: string;
+  currentRows?: number;
+  totalRows?: number;
+  succeededCount?: number;
+  failedCount?: number;
+  skippedCount?: number;
+}
+
+export type SkuImportExecuteProgressHandler = (progress: SkuImportExecuteProgress) => void;
 
 export interface SkuImportExecuteRowResult {
   rowNumber: number;

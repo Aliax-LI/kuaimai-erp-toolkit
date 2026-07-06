@@ -31,7 +31,7 @@ export const WORKBENCH_STEPS = ['import', 'create', 'result'] as const;
 export type WorkbenchStep = (typeof WORKBENCH_STEPS)[number];
 
 export const WORKBENCH_STEP_LABELS: Record<WorkbenchStep, string> = {
-  import: '导入Excel',
+  import: '导入 Excel',
   create: '批量创建',
   result: '创建结果',
 };

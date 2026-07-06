@@ -36,8 +36,8 @@ function baseRow(overrides: Partial<SkuImportPreviewRow>): SkuImportPreviewRow {
 
 describe('preview row labels', () => {
   it('rowStatusLabel 应映射预演状态', () => {
-    expect(rowStatusLabel('pending')).toBe('可执行');
-    expect(rowStatusLabel('preview_blocked')).toBe('已阻断');
+    expect(rowStatusLabel('pending')).toBe('可创建');
+    expect(rowStatusLabel('preview_blocked')).toBe('待修复');
     expect(rowStatusLabel('skipped_existing')).toBe('将跳过');
   });
 

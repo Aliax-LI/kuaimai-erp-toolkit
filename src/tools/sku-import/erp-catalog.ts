@@ -61,12 +61,27 @@ export interface ErpCatalogClient {
   createPureSuite(payload: Omit<PureSuiteAddPayload, 'sellerCids'> & { itemCatName?: string }): Promise<number>;
 }
 
-function chunk<T>(items: T[], size: number): T[][] {
-  const result: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    result.push(items.slice(index, index + size));
+const OUTER_ID_LOOKUP_CONCURRENCY = 6;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = [];
+  let nextIndex = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
+    }
   }
-  return result;
+
+  const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
 }
 
 function normalizeListItem(item: Record<string, unknown>): ErpCatalogItem | null {
@@ -309,22 +324,23 @@ export function createErpCatalogClient(config: ErpWebConfig): ErpCatalogClient {
       const items: ErpCatalogItem[] = [];
       const seen = new Set<string>();
 
-      for (const batch of chunk(unique, 20)) {
-        for (const outerId of batch) {
-          const hits: ErpCatalogItem[] = [];
-          for (const field of ['outerId', 'skuOuterId'] as const) {
-            const response = await queryCatalogPage(1, 5, { [field]: outerId });
-            hits.push(...normalizeListItems(response));
-          }
+      const lookupResults = await mapWithConcurrency(unique, OUTER_ID_LOOKUP_CONCURRENCY, async (outerId) => {
+        const responses = await Promise.all(
+          (['outerId', 'skuOuterId'] as const).map((field) =>
+            queryCatalogPage(1, 5, { [field]: outerId }),
+          ),
+        );
+        return responses.flatMap((response) => normalizeListItems(response));
+      });
 
-          for (const item of hits) {
-            const key = item.outerId || String(item.sysItemId ?? '');
-            if (!key || seen.has(key)) {
-              continue;
-            }
-            seen.add(key);
-            items.push(item);
+      for (const hits of lookupResults) {
+        for (const item of hits) {
+          const key = item.outerId || String(item.sysItemId ?? '');
+          if (!key || seen.has(key)) {
+            continue;
           }
+          seen.add(key);
+          items.push(item);
         }
       }
       return items;

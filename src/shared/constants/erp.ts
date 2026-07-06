@@ -1,4 +1,5 @@
 export const DEFAULT_ERP_BASE_URL = 'https://erp.superboss.cc';
+export const DEFAULT_ERP_COMPANY_ID = '140109';
 
 export const ERP_LOGIN_PATH = '/account/login';
 export const ERP_LOGIN_PAGE_PATH = '/login.html';

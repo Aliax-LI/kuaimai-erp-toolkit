@@ -13,14 +13,14 @@ const NAV_ITEMS = [
 export function Sidebar() {
   return (
     <aside className="flex h-full w-sidebar shrink-0 flex-col border-r border-beige bg-cream-warm">
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 space-y-1 p-2.5">
         {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
             className={({ isActive }) =>
               cn(
-                'relative flex h-10 w-full cursor-pointer items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors duration-150',
+                'relative flex h-9 w-full cursor-pointer items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors duration-150',
                 isActive
                   ? 'bg-charcoal text-cream'
                   : 'text-charcoal hover:bg-cream-light',
@@ -32,8 +32,8 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="border-t border-beige p-3">
-        <div className="px-4 py-2 text-xs text-brown-soft">
+      <div className="border-t border-beige p-2.5">
+        <div className="px-3 py-2 text-xs text-brown-soft">
           <p>v2.0</p>
           <p className="mt-0.5">快麦开放平台</p>
         </div>

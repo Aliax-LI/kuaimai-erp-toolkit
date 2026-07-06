@@ -12,7 +12,7 @@ export function getErpWebConfig(): ErpWebConfig {
 
   const companyId = getSecret('erpCompanyId')?.trim();
   if (!companyId) {
-    throw new Error('缺少 companyId。请在设置页填写（例如 140109）');
+    throw new Error('缺少公司ID。请在设置页填写（例如 140109）');
   }
 
   const { erpBaseUrl } = getAppSettings();

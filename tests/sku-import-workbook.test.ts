@@ -42,7 +42,7 @@ async function createFixtureWorkbook(): Promise<Buffer> {
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets>
-    <sheet name="待创建货号记录" sheetId="1" r:id="rId1"/>
+    <sheet name="不是固定名称" sheetId="1" r:id="rId1"/>
   </sheets>
 </workbook>`,
   );
@@ -159,9 +159,9 @@ async function createFixtureWorkbook(): Promise<Buffer> {
 describe('sku-import workbook', () => {
   it('parseSkuImportWorkbook 应解析表头、行数据与嵌入图片', async () => {
     const workbook = await createFixtureWorkbook();
-    const parsed = await parseSkuImportWorkbook(workbook, '待创建货号记录');
+    const parsed = await parseSkuImportWorkbook(workbook, 'sheet1');
 
-    expect(parsed.sheetName).toBe('待创建货号记录');
+    expect(parsed.sheetName).toBe('不是固定名称');
     expect(parsed.headers.slice(0, 8)).toEqual([
       '日期',
       '产品原品编码',
@@ -195,7 +195,7 @@ describe('sku-import workbook', () => {
 
   it('applySkuImportWorkbookResults 应保留图片并回写结果列', async () => {
     const workbook = await createFixtureWorkbook();
-    const updated = await applySkuImportWorkbookResults(workbook, '待创建货号记录', [
+    const updated = await applySkuImportWorkbookResults(workbook, 'sheet1', [
       {
         rowNumber: 2,
         skuCode: '69-WKAU-CJJ001',
@@ -204,7 +204,7 @@ describe('sku-import workbook', () => {
       },
     ]);
 
-    const reparsed = await parseSkuImportWorkbook(updated, '待创建货号记录');
+    const reparsed = await parseSkuImportWorkbook(updated, 'sheet1');
     expect(reparsed.rows[0]?.values['商品SKU货号']).toBe('69-WKAU-CJJ001');
     expect(reparsed.rows[0]?.values['创建状态']).toBe('succeeded');
     expect(reparsed.rows[0]?.values['失败原因']).toBe('');
@@ -217,13 +217,13 @@ describe('sku-import workbook', () => {
 
   it('sweepGhostRowWritebacks 应清除非数据行上的回写列', async () => {
     const workbook = await createFixtureWorkbook();
-    const withGhost = await applySkuImportWorkbookResults(workbook, '待创建货号记录', [
+    const withGhost = await applySkuImportWorkbookResults(workbook, 'sheet1', [
       { rowNumber: 2, skuCode: '69-WKAU-CJJ001', status: 'succeeded', failureReason: '' },
       { rowNumber: 3, skuCode: 'test-69-BRAND-ITEM001', status: 'preview_blocked', failureReason: '缺少品牌' },
     ]);
 
-    const swept = await sweepGhostRowWritebacks(withGhost, '待创建货号记录');
-    const reparsed = await parseSkuImportWorkbook(swept, '待创建货号记录');
+    const swept = await sweepGhostRowWritebacks(withGhost, 'sheet1');
+    const reparsed = await parseSkuImportWorkbook(swept, 'sheet1');
     expect(reparsed.rows).toHaveLength(1);
     expect(reparsed.rows[0]?.values['商品SKU货号']).toBe('69-WKAU-CJJ001');
     expect(reparsed.rows[0]?.values['创建状态']).toBe('succeeded');

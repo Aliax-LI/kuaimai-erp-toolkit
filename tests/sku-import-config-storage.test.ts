@@ -47,4 +47,21 @@ describe('sku-import-config-storage', () => {
     expect(loaded).toEqual(DEFAULT_SKU_IMPORT_CONFIG);
     expect(fs.existsSync(filePath)).toBe(true);
   });
+
+  it('merges default mappings into an existing old config', () => {
+    const root = createTempRoot();
+    const filePath = resolveSkuImportConfigPath(root);
+    writeSkuImportConfigFile(filePath, {
+      brands: [{ name: 'custom', code: '88', shortName: 'C', enabled: true }],
+      accessories: [{ name: '自定义配件', skuCode: 'PJ-CUSTOM', brand: 'old', enabled: true }],
+      rules: { ...DEFAULT_SKU_IMPORT_CONFIG.rules },
+    });
+
+    const loaded = loadSkuImportConfigFile(filePath);
+
+    expect(loaded.brands.some((brand) => brand.name === 'custom')).toBe(true);
+    expect(loaded.brands.some((brand) => brand.name === 'wkau')).toBe(true);
+    expect(loaded.accessories.some((accessory) => accessory.name === '自定义配件')).toBe(true);
+    expect(loaded.accessories.some((accessory) => accessory.name === '说明书')).toBe(true);
+  });
 });

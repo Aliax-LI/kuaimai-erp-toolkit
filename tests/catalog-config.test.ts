@@ -18,12 +18,12 @@ describe('catalog-config', () => {
     expect(result).toEqual({ error: '品牌「UNKNOWN」未在配置中找到' });
   });
 
-  it('matchAccessoriesFromConfig 应按名称精确匹配并过滤品牌', () => {
+  it('matchAccessoriesFromConfig 应按名称精确匹配且不关联品牌', () => {
     const config = {
       brands: DEFAULT_SKU_IMPORT_CONFIG.brands,
       accessories: [
-        { name: '自粘袋', skuCode: 'PJ-ZND01', brand: 'wkau', enabled: true },
-        { name: '说明书', skuCode: 'PJ-SMS01', brand: 'wkau', enabled: true },
+        { name: '自粘袋', skuCode: 'PJ-ZND01', brand: 'lovi', enabled: true },
+        { name: '说明书', skuCode: 'PJ-SMS01', brand: '', enabled: true },
         { name: '护理液', skuCode: 'HLY03', brand: 'lovi', enabled: true },
       ],
     };

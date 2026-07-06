@@ -17,13 +17,13 @@ export function SegmentedControl<T extends string>({
   onChange,
 }: SegmentedControlProps<T>) {
   return (
-    <div className="flex w-fit items-center gap-1 rounded-lg bg-cream-warm p-0.5">
+    <div className="flex w-full flex-wrap items-center gap-1 rounded-md border border-beige bg-cream-warm p-0.5 sm:w-fit">
       {options.map((option) => (
         <button
           key={option.value}
           type="button"
           className={cn(
-            'rounded-md px-3 py-1.5 text-sm font-medium transition-all',
+            'flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none',
             value === option.value
               ? 'bg-charcoal text-cream'
               : 'text-brown-soft hover:text-charcoal',

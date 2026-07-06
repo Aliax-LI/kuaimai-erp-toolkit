@@ -2,7 +2,13 @@ import path from 'node:path';
 
 import { BrowserWindow } from 'electron';
 
-import { DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH, MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH } from '@shared/constants/app';
+import {
+  APP_NAME,
+  DEFAULT_WINDOW_HEIGHT,
+  DEFAULT_WINDOW_WIDTH,
+  MIN_WINDOW_HEIGHT,
+  MIN_WINDOW_WIDTH,
+} from '@shared/constants/app';
 
 const rendererDevServerUrl = process.env.ELECTRON_RENDERER_URL;
 const rendererEntry = path.join(__dirname, '../renderer/main_window/index.html');
@@ -14,7 +20,7 @@ export function createMainWindow(): BrowserWindow {
     minWidth: MIN_WINDOW_WIDTH,
     minHeight: MIN_WINDOW_HEIGHT,
     show: false,
-    title: '快麦 ERP 工具箱',
+    title: APP_NAME,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
