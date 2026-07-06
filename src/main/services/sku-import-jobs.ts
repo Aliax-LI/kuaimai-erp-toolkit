@@ -29,7 +29,19 @@ function jobPath(jobsDir: string, taskId: string): string {
 
 function stripWorkbookBuffer(parsed: ParsedSkuImportWorkbook): SkuImportJobRecord['parsed'] {
   const { workbookBuffer: _drop, ...rest } = parsed;
-  return rest;
+  return {
+    ...rest,
+    rows: rest.rows.map((row) => ({
+      ...row,
+      images: row.images.map((image) => ({
+        columnIndex: image.columnIndex,
+        rowIndex: image.rowIndex,
+        fileName: image.fileName,
+        contentType: image.contentType,
+        buffer: Buffer.alloc(0),
+      })),
+    })),
+  };
 }
 
 export function saveSkuImportJob(jobsDir: string, record: SkuImportJobRecord): void {

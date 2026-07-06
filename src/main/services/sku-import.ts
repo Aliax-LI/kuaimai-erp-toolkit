@@ -5,7 +5,11 @@ import { randomUUID } from 'node:crypto';
 import { BrowserWindow, dialog, type OpenDialogOptions } from 'electron';
 
 import type {
+  SkuImportExecuteProgress,
+  SkuImportExecuteProgressHandler,
   SkuImportExecuteRowResult,
+  SkuImportPreviewProgress,
+  SkuImportPreviewProgressHandler,
   SkuImportTaskDetail,
   SkuImportTaskSummary,
 } from '@shared/types/sku-import';
@@ -21,6 +25,7 @@ import {
   applySkuImportWorkbookResults,
   clearSkuImportWorkbookResults,
   parseSkuImportWorkbook,
+  sweepGhostRowWritebacks,
   type ParsedSkuImportWorkbook,
 } from '../../tools/sku-import/workbook';
 
@@ -44,6 +49,33 @@ const EXCEL_DIALOG_OPTIONS: OpenDialogOptions = {
   ],
 };
 
+function formatFileAccessError(filePath: string, err: unknown): Error {
+  const code = typeof err === 'object' && err !== null && 'code' in err ? String(err.code) : '';
+  const message = err instanceof Error ? err.message : String(err);
+  if (code === 'EACCES' || code === 'EPERM' || /operation not permitted|permission/i.test(message)) {
+    return new Error(
+      `访问 Excel 被系统权限拒绝：${filePath}。请把文件移动到“文稿/下载”等可访问目录，或在 macOS「系统设置 > 隐私与安全性 > 文件与文件夹/完全磁盘访问权限」允许本应用访问。`,
+    );
+  }
+  return err instanceof Error ? err : new Error(message);
+}
+
+function readWorkbookBuffer(filePath: string): Buffer {
+  try {
+    return fs.readFileSync(path.resolve(filePath));
+  } catch (err) {
+    throw formatFileAccessError(filePath, err);
+  }
+}
+
+function writeWorkbookBuffer(filePath: string, buffer: Buffer): void {
+  try {
+    fs.writeFileSync(filePath, buffer);
+  } catch (err) {
+    throw formatFileAccessError(filePath, err);
+  }
+}
+
 let jobsDir = '';
 
 export function initSkuImportJobs(dir: string): void {
@@ -64,7 +96,7 @@ function persistTask(task: SkuImportJobRecord): void {
 }
 
 function loadParsedWithWorkbook(task: SkuImportJobRecord): Promise<ParsedSkuImportWorkbook> {
-  const workbookBuffer = fs.readFileSync(path.resolve(task.filePath));
+  const workbookBuffer = readWorkbookBuffer(task.filePath);
   return parseSkuImportWorkbook(workbookBuffer, task.parsed.sheetName);
 }
 
@@ -99,6 +131,26 @@ function toTaskDetail(task: SkuImportJobRecord): SkuImportTaskDetail {
   };
 }
 
+function emitPreviewProgress(
+  onProgress: SkuImportPreviewProgressHandler | undefined,
+  progress: SkuImportPreviewProgress,
+): void {
+  onProgress?.({
+    ...progress,
+    percent: Math.max(0, Math.min(100, Math.round(progress.percent))),
+  });
+}
+
+function emitExecuteProgress(
+  onProgress: SkuImportExecuteProgressHandler | undefined,
+  progress: SkuImportExecuteProgress,
+): void {
+  onProgress?.({
+    ...progress,
+    percent: Math.max(0, Math.min(100, Math.round(progress.percent))),
+  });
+}
+
 function getTaskOrThrow(taskId: string): SkuImportJobRecord {
   const task = loadSkuImportJob(requireJobsDir(), taskId);
   if (!task) {
@@ -110,20 +162,42 @@ function getTaskOrThrow(taskId: string): SkuImportJobRecord {
 async function enrichExecuteResultWithVerification(
   task: SkuImportJobRecord,
   executeResult: NonNullable<SkuImportJobRecord['executeResult']>,
+  onProgress?: SkuImportExecuteProgressHandler,
 ): Promise<NonNullable<SkuImportJobRecord['executeResult']>> {
   const catalog = createErpCatalogClient(getErpWebConfig());
   const client = createErpWebClient(getErpWebConfig());
   const enrichedRows: SkuImportExecuteRowResult[] = [];
+  const totalRows = executeResult.rows.length;
 
-  for (const rowResult of executeResult.rows) {
+  for (const [index, rowResult] of executeResult.rows.entries()) {
     if (rowResult.status !== 'succeeded' && rowResult.status !== 'skipped_existing') {
       enrichedRows.push(rowResult);
+      emitExecuteProgress(onProgress, {
+        stage: 'verifying',
+        taskId: task.id,
+        filePath: task.filePath,
+        percent: totalRows > 0 ? 92 + ((index + 1) / totalRows) * 7 : 99,
+        message: `正在验证第 ${index + 1} / ${totalRows} 行`,
+        currentRows: index + 1,
+        totalRows,
+        ...summarizeSkuImportExecuteRows(enrichedRows, task.preview.totalRows),
+      });
       continue;
     }
 
     const previewRow = task.preview.rows.find((row) => row.rowNumber === rowResult.rowNumber);
     if (!previewRow) {
       enrichedRows.push(rowResult);
+      emitExecuteProgress(onProgress, {
+        stage: 'verifying',
+        taskId: task.id,
+        filePath: task.filePath,
+        percent: totalRows > 0 ? 92 + ((index + 1) / totalRows) * 7 : 99,
+        message: `正在验证第 ${index + 1} / ${totalRows} 行`,
+        currentRows: index + 1,
+        totalRows,
+        ...summarizeSkuImportExecuteRows(enrichedRows, task.preview.totalRows),
+      });
       continue;
     }
 
@@ -136,6 +210,16 @@ async function enrichExecuteResultWithVerification(
       failureReason:
         rowResult.failureReason ||
         (verification.ok ? '' : `结构验证未通过: ${failedLabels.join('、')}`),
+    });
+    emitExecuteProgress(onProgress, {
+      stage: 'verifying',
+      taskId: task.id,
+      filePath: task.filePath,
+      percent: totalRows > 0 ? 92 + ((index + 1) / totalRows) * 7 : 99,
+      message: `正在验证第 ${index + 1} / ${totalRows} 行`,
+      currentRows: index + 1,
+      totalRows,
+      ...summarizeSkuImportExecuteRows(enrichedRows, task.preview.totalRows),
     });
   }
 
@@ -166,7 +250,7 @@ export async function clearAllSkuImportTasks(): Promise<{
       continue;
     }
     try {
-      const workbookBuffer = fs.readFileSync(path.resolve(filePath));
+      const workbookBuffer = readWorkbookBuffer(filePath);
       const parsed = await parseSkuImportWorkbook(workbookBuffer, SKU_IMPORT_SHEET_NAME);
       const rowNumbers = parsed.rows.map((row) => row.rowNumber);
       if (rowNumbers.length === 0) {
@@ -177,7 +261,7 @@ export async function clearAllSkuImportTasks(): Promise<{
         SKU_IMPORT_SHEET_NAME,
         rowNumbers,
       );
-      fs.writeFileSync(filePath, updated);
+      writeWorkbookBuffer(filePath, updated);
       clearedFiles.push(filePath);
     } catch (err) {
       logger.warn('sku-import', 'clear workbook results failed', {
@@ -213,16 +297,43 @@ export async function pickSkuImportFile(win?: BrowserWindow | null): Promise<str
   return result.filePaths[0] ?? null;
 }
 
-export async function previewSkuImportFile(filePath: string): Promise<SkuImportTaskDetail> {
+export async function previewSkuImportFile(
+  filePath: string,
+  onProgress?: SkuImportPreviewProgressHandler,
+): Promise<SkuImportTaskDetail> {
   if (!filePath.trim() || !fs.existsSync(filePath)) {
     throw new Error('Excel 文件不存在');
   }
 
-  const workbookBuffer = fs.readFileSync(path.resolve(filePath));
-  const parsed = await parseSkuImportWorkbook(workbookBuffer, SKU_IMPORT_SHEET_NAME);
-  const catalog = createErpCatalogClient(getErpWebConfig());
   const taskId = randomUUID();
   const now = new Date().toISOString();
+  emitPreviewProgress(onProgress, {
+    taskId,
+    filePath,
+    stage: 'reading',
+    percent: 5,
+    message: '正在读取 Excel 文件',
+  });
+  const workbookBuffer = readWorkbookBuffer(filePath);
+  emitPreviewProgress(onProgress, {
+    taskId,
+    filePath,
+    stage: 'parsing',
+    percent: 15,
+    message: '正在解析 Sheet1',
+  });
+  const parsed = await parseSkuImportWorkbook(workbookBuffer, SKU_IMPORT_SHEET_NAME);
+  emitPreviewProgress(onProgress, {
+    taskId,
+    filePath,
+    stage: 'config',
+    percent: 25,
+    message: `已读取 ${parsed.rows.length} 行，正在加载配置`,
+    currentRows: 0,
+    totalRows: parsed.rows.length,
+  });
+  const catalog = createErpCatalogClient(getErpWebConfig());
+  const importConfig = getSkuImportConfig();
 
   logger.info('sku-import', 'preview start', {
     filePath,
@@ -235,8 +346,25 @@ export async function previewSkuImportFile(filePath: string): Promise<SkuImportT
     filePath,
     parsed,
     catalog,
-    getSkuImportConfig(),
+    importConfig,
+    {
+      onProgress: (progress) =>
+        emitPreviewProgress(onProgress, {
+          ...progress,
+          taskId,
+          filePath,
+        }),
+    },
   );
+  emitPreviewProgress(onProgress, {
+    taskId,
+    filePath,
+    stage: 'saving',
+    percent: 98,
+    message: '正在保存预演任务',
+    currentRows: parsed.rows.length,
+    totalRows: parsed.rows.length,
+  });
   const task: SkuImportJobRecord = {
     id: taskId,
     filePath,
@@ -254,11 +382,23 @@ export async function previewSkuImportFile(filePath: string): Promise<SkuImportT
     blockedCount: preview.blockedCount,
     skippedCount: preview.skippedCount,
   });
+  emitPreviewProgress(onProgress, {
+    taskId,
+    filePath,
+    stage: 'done',
+    percent: 100,
+    message: '预演完成',
+    currentRows: parsed.rows.length,
+    totalRows: parsed.rows.length,
+  });
 
   return toTaskDetail(task);
 }
 
-export async function executeSkuImportTask(taskId: string): Promise<SkuImportTaskDetail> {
+export async function executeSkuImportTask(
+  taskId: string,
+  onProgress?: SkuImportExecuteProgressHandler,
+): Promise<SkuImportTaskDetail> {
   const task = getTaskOrThrow(taskId);
   if (task.status === 'executing') {
     throw new Error('任务正在执行中');
@@ -274,6 +414,15 @@ export async function executeSkuImportTask(taskId: string): Promise<SkuImportTas
   task.updatedAt = new Date().toISOString();
   task.failureMessage = undefined;
   persistTask(task);
+  emitExecuteProgress(onProgress, {
+    stage: 'preparing',
+    taskId,
+    filePath: task.filePath,
+    percent: 1,
+    message: '正在准备创建任务',
+    currentRows: 0,
+    totalRows: task.preview.rows.length,
+  });
 
   const catalog = createErpCatalogClient(getErpWebConfig());
   const ossConfig = getErpOssConfig();
@@ -292,9 +441,10 @@ export async function executeSkuImportTask(taskId: string): Promise<SkuImportTas
       previewRows: task.preview.rows,
       catalog,
       ossConfig,
+      onProgress: (progress) => emitExecuteProgress(onProgress, progress),
     });
 
-    fs.writeFileSync(task.filePath, updatedWorkbook);
+    writeWorkbookBuffer(task.filePath, updatedWorkbook);
     task.parsed = {
       ...task.parsed,
       rows: parsed.rows,
@@ -302,7 +452,7 @@ export async function executeSkuImportTask(taskId: string): Promise<SkuImportTas
     task.executeResult = await enrichExecuteResultWithVerification(task, {
       ...executeResult,
       ...summarizeSkuImportExecuteRows(executeResult.rows, task.preview.totalRows),
-    });
+    }, onProgress);
     task.status = 'completed';
     task.updatedAt = new Date().toISOString();
 
@@ -319,6 +469,18 @@ export async function executeSkuImportTask(taskId: string): Promise<SkuImportTas
       failedCount: task.executeResult.failedCount,
       skippedCount: task.executeResult.skippedCount,
       verifyFailedCount,
+    });
+    emitExecuteProgress(onProgress, {
+      stage: 'done',
+      taskId,
+      filePath: task.filePath,
+      percent: 100,
+      message: '创建完成',
+      currentRows: task.executeResult.rows.length,
+      totalRows: task.executeResult.rows.length,
+      succeededCount: task.executeResult.succeededCount,
+      failedCount: task.executeResult.failedCount,
+      skippedCount: task.executeResult.skippedCount,
     });
 
     return toTaskDetail(task);
@@ -339,11 +501,52 @@ export async function writeSkuImportResultsOnly(
   filePath: string,
   results: Array<{ rowNumber: number; skuCode: string; status: string; failureReason: string }>,
 ): Promise<void> {
-  const workbookBuffer = fs.readFileSync(path.resolve(filePath));
+  const workbookBuffer = readWorkbookBuffer(filePath);
   const updated = await applySkuImportWorkbookResults(
     workbookBuffer,
     SKU_IMPORT_SHEET_NAME,
     results,
   );
-  fs.writeFileSync(filePath, updated);
+  writeWorkbookBuffer(filePath, updated);
+}
+
+export async function exportSkuImportTaskResults(
+  taskId: string,
+  win?: BrowserWindow | null,
+): Promise<string | null> {
+  const task = getTaskOrThrow(taskId);
+  if (!task.executeResult) {
+    throw new Error('该任务还没有执行结果，无法导出');
+  }
+
+  const parsed = await loadParsedWithWorkbook(task);
+  const updated = await applySkuImportWorkbookResults(
+    parsed.workbookBuffer,
+    parsed.sheetName,
+    task.executeResult.rows.map((row) => ({
+      rowNumber: row.rowNumber,
+      skuCode: row.skuCode,
+      status: row.status,
+      failureReason: row.failureReason,
+    })),
+  );
+  const finalWorkbook = await sweepGhostRowWritebacks(updated, parsed.sheetName);
+  const source = path.parse(task.filePath);
+  const defaultPath = path.join(source.dir, `${source.name}-创建结果${source.ext || '.xlsx'}`);
+  const result = win
+    ? await dialog.showSaveDialog(win, {
+        defaultPath,
+        filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+      })
+    : await dialog.showSaveDialog({
+        defaultPath,
+        filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+      });
+
+  if (result.canceled || !result.filePath) {
+    return null;
+  }
+
+  writeWorkbookBuffer(result.filePath, finalWorkbook);
+  return result.filePath;
 }

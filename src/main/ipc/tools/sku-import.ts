@@ -7,6 +7,7 @@ import {
   clearAllSkuImportTasks,
   deleteSkuImportTask,
   executeSkuImportTask,
+  exportSkuImportTaskResults,
   getSkuImportTask,
   listSkuImportTasks,
   pickSkuImportFile,
@@ -26,8 +27,10 @@ export function registerSkuImportIpc(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.SKU_IMPORT_PREVIEW,
-    wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_PREVIEW, async (_event, filePath: string) =>
-      previewSkuImportFile(filePath),
+    wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_PREVIEW, async (event, filePath: string) =>
+      previewSkuImportFile(filePath, (progress) => {
+        event.sender.send(IPC_CHANNELS.SKU_IMPORT_PREVIEW_PROGRESS, progress);
+      }),
     ),
   );
 
@@ -57,9 +60,19 @@ export function registerSkuImportIpc(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.SKU_IMPORT_EXECUTE,
-    wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_EXECUTE, async (_event, taskId: string) =>
-      executeSkuImportTask(taskId),
+    wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_EXECUTE, async (event, taskId: string) =>
+      executeSkuImportTask(taskId, (progress) => {
+        event.sender.send(IPC_CHANNELS.SKU_IMPORT_EXECUTE_PROGRESS, progress);
+      }),
     ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.SKU_IMPORT_EXPORT_RESULTS,
+    wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_EXPORT_RESULTS, async (event, taskId: string) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      return exportSkuImportTaskResults(taskId, win);
+    }),
   );
 
   ipcMain.handle(

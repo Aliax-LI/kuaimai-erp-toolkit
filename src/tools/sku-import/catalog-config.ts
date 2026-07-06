@@ -1,4 +1,4 @@
-import type { AccessoryConfig, BrandConfig, SkuImportConfig } from '@shared/schemas/sku-import-config';
+import type { BrandConfig, SkuImportConfig } from '@shared/schemas/sku-import-config';
 
 export interface ConfigAccessoryMatch {
   name: string;
@@ -36,12 +36,11 @@ export function resolveBrandCodeFromConfig(
 
 export function matchAccessoriesFromConfig(
   accessoryNames: string[],
-  rowBrand: string,
+  _rowBrand: string,
   config: Pick<SkuImportConfig, 'accessories'>,
 ): { matched: ConfigAccessoryMatch[]; missing: string[] } {
   const matched: ConfigAccessoryMatch[] = [];
   const missing: string[] = [];
-  const rowBrandKey = normalizeKey(rowBrand);
 
   for (const rawName of accessoryNames) {
     const name = rawName.trim();
@@ -54,9 +53,6 @@ export function matchAccessoriesFromConfig(
         return false;
       }
       if (normalizeKey(accessory.name) !== key) {
-        return false;
-      }
-      if (accessory.brand.trim() && normalizeKey(accessory.brand) !== rowBrandKey) {
         return false;
       }
       return true;

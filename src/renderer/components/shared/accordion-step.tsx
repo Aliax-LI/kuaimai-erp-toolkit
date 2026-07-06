@@ -31,8 +31,8 @@ export function AccordionStep({
   return (
     <div
       className={cn(
-        'rounded-xl border bg-cream-white transition-all duration-200',
-        active ? 'border-amber shadow-sm' : 'border-beige',
+        'border bg-cream-white transition-colors duration-200',
+        active ? 'border-amber' : 'border-beige',
         disabled && 'opacity-70',
       )}
     >

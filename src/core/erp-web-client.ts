@@ -149,7 +149,7 @@ export function assertErpBusinessSuccess(body: Record<string, unknown>, action: 
 
   if (result === 901) {
     throw new ErpWebError(
-      `${message}。请确认 ERP Cookie 与 companyId 有效，必要时重新登录或从浏览器 Network 复制`,
+      `${message}。请确认 ERP Cookie 与公司ID 有效，必要时重新登录或从浏览器 Network 复制`,
       result,
     );
   }

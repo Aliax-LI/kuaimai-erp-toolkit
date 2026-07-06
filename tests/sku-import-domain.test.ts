@@ -32,13 +32,22 @@ describe('sku-import domain', () => {
     expect(deriveProductNameInitials('Oil Cleaner')).toBe('OC');
   });
 
+  it('deriveProductNameInitials 中文产品名取拼音首字母并大写', () => {
+    expect(deriveProductNameInitials('穿戴甲胶水')).toBe('CDJJS');
+    expect(deriveProductNameInitials('布艺泡沫干洗剂')).toBe('BYPMGXJ');
+    expect(deriveProductNameInitials('车漆镀晶喷雾3.0')).toBe('CQDJPW');
+  });
+
   it('buildBundleOuterId 应按前缀-品牌编码-产品名首字母+贴纸编码生成', () => {
     expect(
       buildBundleOuterId(DEFAULT_SKU_IMPORT_RULES, '39', 'test', 'test09590724'),
-    ).toBe('69-39-Ttest09590724');
+    ).toBe('69-39-T-test09590724');
     expect(
       buildBundleOuterId({ skuCodePrefix: 'test69' }, '42', 'Oil Cleaner', 'tets09590724'),
-    ).toBe('test69-42-OCtets09590724');
+    ).toBe('test69-42-OC-tets09590724');
+    expect(
+      buildBundleOuterId(DEFAULT_SKU_IMPORT_RULES, '39', '穿戴甲胶水', '09590707'),
+    ).toBe('69-39-CDJJS-09590707');
   });
 
   it('buildBundleTitle 应包含名称列容量包装信息', () => {
@@ -52,6 +61,16 @@ describe('sku-import domain', () => {
     ).toBe(
       'jokjok油污清洁剂 - 30ml黑色pe瓶（跨境）*1+自粘袋*1+跨境说明书*1+海绵*1+喷头*1',
     );
+  });
+
+  it('buildBundleTitle 应去掉名称列开头重复的品牌与产品名', () => {
+    expect(
+      buildBundleTitle('WKAU', '布艺泡沫干洗剂', '布艺泡沫干洗剂30g喷剂', ['圆海绵']),
+    ).toBe('WKAU布艺泡沫干洗剂 - 30g喷剂*1+圆海绵*1');
+
+    expect(
+      buildBundleTitle('WKAU', '划痕蜡', 'WKAU划痕蜡', ['小圆棉']),
+    ).toBe('WKAU划痕蜡*1+小圆棉*1');
   });
 
   it('buildStickerTitle 应拼接贴纸名称', () => {

@@ -1,6 +1,10 @@
 import type { SkuImportRules } from '@shared/schemas/sku-import-config';
+import { pinyin } from 'pinyin-pro';
 
 const ACCESSORY_SPLIT_RE = /[\s,，、;；]+/;
+const CJK_RE = /[\u4e00-\u9fff]/;
+const LATIN_LETTER_RE = /[A-Za-z]/;
+const TITLE_SEPARATOR_RE = /^[\s\-—–_:：/\\|]+/;
 
 export function parseAccessoryNames(raw: string | undefined): string[] {
   if (!raw?.trim()) {
@@ -17,31 +21,49 @@ export function buildBusinessKey(values: Record<string, string>): string {
   return [productCode, stickerCode, displayName].filter(Boolean).join('|');
 }
 
-/** 产品名首字母大写：英文按词取首字母；含中文时取各汉字首字符（无拼音库时的近似） */
+/** 产品名首字母大写：中文按拼音首字母，英文按词首字母，忽略数字与符号 */
 export function deriveProductNameInitials(productName: string): string {
   const trimmed = productName.trim();
   if (!trimmed) {
     return '';
   }
 
-  const latinWords = trimmed.match(/[A-Za-z]+/g);
-  if (latinWords && latinWords.length > 0) {
-    return latinWords.map((word) => word[0].toUpperCase()).join('');
+  let result = '';
+  let inLatinWord = false;
+
+  for (const char of trimmed) {
+    if (CJK_RE.test(char)) {
+      const initial = pinyin(char, {
+        pattern: 'first',
+        toneType: 'none',
+        type: 'array',
+      })[0];
+      if (initial && LATIN_LETTER_RE.test(initial)) {
+        result += initial.toUpperCase();
+      }
+      inLatinWord = false;
+      continue;
+    }
+
+    if (LATIN_LETTER_RE.test(char)) {
+      if (!inLatinWord) {
+        result += char.toUpperCase();
+      }
+      inLatinWord = true;
+      continue;
+    }
+
+    inLatinWord = false;
   }
 
-  const cjkChars = [...trimmed].filter((char) => /[\u4e00-\u9fa5]/.test(char));
-  if (cjkChars.length > 0) {
-    return cjkChars.join('');
-  }
-
-  return trimmed[0].toUpperCase();
+  return result || trimmed[0].toUpperCase();
 }
 
 export function buildStickerOuterId(bundleOuterId: string): string {
   return `${bundleOuterId}-ST`;
 }
 
-/** 套装货号：{前缀}-{品牌编码}-{产品名首字母}{贴纸编码} */
+/** 套装货号：{前缀}-{品牌编码}-{产品名首字母}-{贴纸编码} */
 export function buildBundleOuterId(
   rules: Pick<SkuImportRules, 'skuCodePrefix'>,
   brandCode: string,
@@ -52,7 +74,7 @@ export function buildBundleOuterId(
   const code = brandCode.replace(/[^A-Z0-9]/gi, '').toUpperCase() || 'BRAND';
   const initials = deriveProductNameInitials(productName);
   const sticker = stickerCode.trim();
-  return `${prefix}-${code}-${initials}${sticker}`;
+  return `${prefix}-${code}-${initials}-${sticker}`;
 }
 
 export function buildStickerTitle(
@@ -63,14 +85,45 @@ export function buildStickerTitle(
   return `${brand}${productName}${capacity}贴纸`.replace(/\s+/g, '');
 }
 
+function trimLeadingTitleSeparators(value: string): string {
+  return value.replace(TITLE_SEPARATOR_RE, '').trim();
+}
+
+function stripLeadingTitleToken(value: string, token: string): string {
+  const normalizedToken = token.trim();
+  const trimmed = trimLeadingTitleSeparators(value);
+  if (!normalizedToken) {
+    return trimmed;
+  }
+
+  if (trimmed.toLowerCase().startsWith(normalizedToken.toLowerCase())) {
+    return trimLeadingTitleSeparators(trimmed.slice(normalizedToken.length));
+  }
+
+  return trimmed;
+}
+
+function buildBundlePrimaryTitle(brand: string, productName: string, displayName: string): string {
+  const baseTitle = `${brand}${productName}`.replace(/\s+/g, '');
+  const rawPackageLabel = displayName.trim() || productName.trim();
+  const packageLabel = stripLeadingTitleToken(
+    stripLeadingTitleToken(rawPackageLabel, brand),
+    productName,
+  );
+
+  return packageLabel ? `${baseTitle} - ${packageLabel}*1` : `${baseTitle}*1`;
+}
+
 export function buildBundleTitle(
   brand: string,
   productName: string,
   displayName: string,
   accessories: string[],
 ): string {
-  const packageLabel = displayName.trim() || productName;
-  const parts = [`${brand}${productName} - ${packageLabel}*1`, ...accessories.map((item) => `${item}*1`)];
+  const parts = [
+    buildBundlePrimaryTitle(brand, productName, displayName),
+    ...accessories.map((item) => item.trim()).filter(Boolean).map((item) => `${item}*1`),
+  ];
   return parts.join('+');
 }
 

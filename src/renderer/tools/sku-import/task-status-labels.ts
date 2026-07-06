@@ -3,9 +3,9 @@ import type { SkuImportPreviewRow, SkuImportTaskStatus } from '@shared/types/sku
 export function rowStatusLabel(status: SkuImportPreviewRow['status']): string {
   switch (status) {
     case 'pending':
-      return '可执行';
+      return '可创建';
     case 'preview_blocked':
-      return '已阻断';
+      return '待修复';
     case 'skipped_existing':
       return '将跳过';
     case 'succeeded':

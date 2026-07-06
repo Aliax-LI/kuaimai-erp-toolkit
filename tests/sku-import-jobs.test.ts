@@ -33,7 +33,21 @@ const sampleJob: SkuImportJobRecord = {
   parsed: {
     sheetName: '待创建货号记录',
     headers: ['品牌'],
-    rows: [{ rowNumber: 2, values: { 品牌: 'WKAU' }, images: [] }],
+    rows: [
+      {
+        rowNumber: 2,
+        values: { 品牌: 'WKAU' },
+        images: [
+          {
+            columnIndex: 1,
+            rowIndex: 1,
+            fileName: 'image.png',
+            contentType: 'image/png',
+            buffer: Buffer.from('large-image'),
+          },
+        ],
+      },
+    ],
     workbookBuffer: Buffer.alloc(0),
   },
   preview: {
@@ -59,6 +73,7 @@ describe('sku-import-jobs', () => {
     expect(loaded?.id).toBe('task-1');
     expect(loaded?.parsed.rows[0].values['品牌']).toBe('WKAU');
     expect(loaded?.parsed.workbookBuffer).toBeUndefined();
+    expect(loaded?.parsed.rows[0].images[0]?.buffer).toEqual({ type: 'Buffer', data: [] });
   });
 
   it('list 按 updatedAt 降序', () => {

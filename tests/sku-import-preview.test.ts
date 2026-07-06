@@ -122,6 +122,75 @@ describe('buildSkuImportPreview', () => {
     expect(result.rows[0].matchedAccessorySkus[0].skuOuterId).toBe('PJ-ZND01-02');
     expect(result.rows[0].productOriginalOuterId).toBe('YP-BYMPGXJ01');
     expect(result.rows[0].stickerOuterId).toBe('test0628');
-    expect(result.rows[0].proposedSkuCode).toBe('69-39-Ttest0628');
+    expect(result.rows[0].proposedSkuCode).toBe('69-39-T-test0628');
+  });
+
+  it('重复配件预演应批量预取并复用 ERP 查询结果', async () => {
+    const parsed: ParsedSkuImportWorkbook = {
+      ...baseParsed,
+      rows: [
+        baseParsed.rows[0],
+        {
+          ...baseParsed.rows[0],
+          rowNumber: 3,
+          values: {
+            ...validRowValues,
+            贴纸编码: 'test0629',
+          },
+        },
+      ],
+    };
+    const getItemsByOuterIds = vi.fn(async (ids: string[]) => {
+      const map: Record<string, { outerId: string; sysItemId: number; title: string }> = {
+        'YP-BYMPGXJ01': { outerId: 'YP-BYMPGXJ01', sysItemId: 50, title: '原品' },
+        'PJ-ZND01': { outerId: 'PJ-ZND01', sysItemId: 100, title: '自粘袋' },
+        'PJ-SMS01': { outerId: 'PJ-SMS01', sysItemId: 101, title: '说明书' },
+      };
+      return ids.filter((id) => map[id]).map((id) => map[id]);
+    });
+    const buildBridgeEntryForOuterId = vi.fn(async (outerId: string) => ({
+      subItemId: outerId === 'PJ-ZND01' ? 100 : 101,
+      outerId: `${outerId}-SKU`,
+      title: outerId,
+      ratio: 1,
+    }));
+    const catalog = mockCatalog({
+      getItemsByOuterIds,
+      buildBridgeEntryForOuterId,
+    });
+
+    const result = await buildSkuImportPreview('s1', '/tmp/x.xlsx', parsed, catalog, testConfig);
+
+    expect(result.readyCount).toBe(2);
+    expect(getItemsByOuterIds).toHaveBeenCalledTimes(1);
+    expect(getItemsByOuterIds.mock.calls[0][0]).toEqual(
+      expect.arrayContaining(['YP-BYMPGXJ01', 'PJ-ZND01', 'PJ-SMS01', 'test0628', 'test0629']),
+    );
+    expect(buildBridgeEntryForOuterId).toHaveBeenCalledTimes(2);
+  });
+
+  it('预演时应上报 ERP 查询与行匹配进度', async () => {
+    const catalog = mockCatalog({});
+    mockProductOriginal(catalog);
+    const onProgress = vi.fn();
+
+    await buildSkuImportPreview('s1', '/tmp/x.xlsx', baseParsed, catalog, configMissingManual, {
+      onProgress,
+    });
+
+    expect(onProgress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: 'erp_lookup',
+        percent: 35,
+        totalRows: 1,
+      }),
+    );
+    expect(onProgress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: 'matching',
+        currentRows: 1,
+        totalRows: 1,
+      }),
+    );
   });
 });

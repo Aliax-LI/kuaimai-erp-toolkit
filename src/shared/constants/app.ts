@@ -1,4 +1,4 @@
-export const APP_NAME = '快麦 ERP 工具箱';
+export const APP_NAME = '快麦小工具';
 export const APP_SUBTITLE = '桌面小工具集合';
 export const APP_VERSION = '0.1.0';
 

@@ -159,6 +159,7 @@ async function resolveWorkbookParts(
   sheetName: string,
 ): Promise<{
   sheetPath: string;
+  sheetDisplayName: string;
   sharedStringsPath?: string;
 }> {
   const workbookXml = await zip.file('xl/workbook.xml')?.async('string');
@@ -181,7 +182,10 @@ async function resolveWorkbookParts(
   };
 
   const sheets = asArray(workbook.workbook?.sheets?.sheet);
-  const targetSheet = sheets.find((sheet) => sheet['@_name'] === sheetName);
+  const targetSheet =
+    sheetName.trim().toLowerCase() === 'sheet1'
+      ? sheets[0]
+      : sheets.find((sheet) => sheet['@_name'] === sheetName);
   if (!targetSheet) {
     throw new Error(`未找到工作表: ${sheetName}`);
   }
@@ -198,6 +202,7 @@ async function resolveWorkbookParts(
 
   return {
     sheetPath: normalizeZipPath(sheetRel['@_Target'], 'xl/workbook.xml'),
+    sheetDisplayName: targetSheet['@_name'] || sheetName,
     sharedStringsPath: sharedStringsRel?.['@_Target']
       ? normalizeZipPath(sharedStringsRel['@_Target'], 'xl/workbook.xml')
       : undefined,
@@ -384,10 +389,10 @@ function setRowCellValue(
 
 export async function parseSkuImportWorkbook(
   workbookBuffer: Buffer,
-  sheetName = '待创建货号记录',
+  sheetName = 'sheet1',
 ): Promise<ParsedSkuImportWorkbook> {
   const zip = await JSZip.loadAsync(workbookBuffer);
-  const { sheetPath, sharedStringsPath } = await resolveWorkbookParts(zip, sheetName);
+  const { sheetPath, sheetDisplayName, sharedStringsPath } = await resolveWorkbookParts(zip, sheetName);
   const sheetXml = await zip.file(sheetPath)?.async('string');
   if (!sheetXml) {
     throw new Error(`未找到工作表内容: ${sheetName}`);
@@ -405,7 +410,7 @@ export async function parseSkuImportWorkbook(
   };
   const rows = asArray(worksheet.worksheet?.sheetData?.row);
   if (rows.length === 0) {
-    return { sheetName, headers: [], rows: [], workbookBuffer };
+    return { sheetName: sheetDisplayName, headers: [], rows: [], workbookBuffer };
   }
 
   const headerRow = rows[0];
@@ -441,7 +446,7 @@ export async function parseSkuImportWorkbook(
     .filter((row) => isSkuImportDataRow(row.values));
 
   return {
-    sheetName,
+    sheetName: sheetDisplayName,
     headers,
     rows: parsedRows,
     workbookBuffer,

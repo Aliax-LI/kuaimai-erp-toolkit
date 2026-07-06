@@ -2,6 +2,7 @@ import { uploadToErpOss } from '../../core/erp-oss-uploader';
 import type { ErpOssConfig } from '../../core/erp-oss-uploader';
 import {
   summarizeSkuImportExecuteRows,
+  type SkuImportExecuteProgressHandler,
   type SkuImportExecuteResult,
   type SkuImportPreviewRow,
 } from '@shared/types/sku-import';
@@ -20,11 +21,6 @@ function shouldWritebackRow(parsed: ParsedSkuImportWorkbook, rowNumber: number):
   return Boolean(sourceRow && isSkuImportDataRow(sourceRow.values));
 }
 
-function isMissingItemPicPath(picPath: unknown): boolean {
-  const normalized = String(picPath ?? '').trim();
-  return !normalized || normalized.includes('no_pic.png');
-}
-
 async function resolveStickerBridgeEntry(
   catalog: ErpCatalogClient,
   stickerCode: string,
@@ -40,16 +36,6 @@ async function resolveStickerBridgeEntry(
 ): Promise<SuiteBridgeEntry> {
   const existing = await catalog.buildBridgeEntryForOuterId(stickerCode);
   if (existing) {
-    if (createPayload.picPath) {
-      const detail = await catalog.getItemDetailRecord(existing.subItemId);
-      if (isMissingItemPicPath(detail.picPath)) {
-        await catalog.updateItemPicPath(existing.subItemId, createPayload.picPath);
-      }
-      return {
-        ...existing,
-        picPath: createPayload.picPath,
-      };
-    }
     return existing;
   }
 
@@ -59,9 +45,6 @@ async function resolveStickerBridgeEntry(
     brand: createPayload.brand,
     itemCatName: createPayload.itemCatName,
     unit: createPayload.unit,
-    component: createPayload.component,
-    standard: createPayload.standard,
-    picPath: createPayload.picPath,
   });
 
   const created = await catalog.buildBridgeEntryForOuterId(stickerCode);
@@ -93,6 +76,7 @@ export async function executeSkuImportRows(options: {
   previewRows: SkuImportPreviewRow[];
   catalog: ErpCatalogClient;
   ossConfig: ErpOssConfig;
+  onProgress?: SkuImportExecuteProgressHandler;
 }): Promise<{ executeResult: SkuImportExecuteResult; updatedWorkbook: Buffer }> {
   const rowResults: SkuImportExecuteResult['rows'] = [];
   const writebacks: Array<{
@@ -112,8 +96,32 @@ export async function executeSkuImportRows(options: {
       writebacks.push(entry);
     }
   };
+  const totalRows = options.previewRows.length;
+  const emitRowProgress = (index: number) => {
+    const summary = summarizeSkuImportExecuteRows(rowResults, totalRows);
+    options.onProgress?.({
+      stage: 'executing',
+      taskId: options.sessionId,
+      filePath: options.filePath,
+      percent: totalRows > 0 ? 5 + ((index + 1) / totalRows) * 80 : 85,
+      message: `正在处理第 ${index + 1} / ${totalRows} 行`,
+      currentRows: index + 1,
+      totalRows,
+      ...summary,
+    });
+  };
 
-  for (const previewRow of options.previewRows) {
+  options.onProgress?.({
+    stage: 'executing',
+    taskId: options.sessionId,
+    filePath: options.filePath,
+    percent: 5,
+    message: `准备创建 ${totalRows} 行`,
+    currentRows: 0,
+    totalRows,
+  });
+
+  for (const [index, previewRow] of options.previewRows.entries()) {
     if (previewRow.status === 'skipped_existing') {
       rowResults.push({
         rowNumber: previewRow.rowNumber,
@@ -127,6 +135,7 @@ export async function executeSkuImportRows(options: {
         status: 'skipped_existing',
         failureReason: previewRow.blockedReason ?? '已存在，跳过',
       });
+      emitRowProgress(index);
       continue;
     }
 
@@ -143,6 +152,7 @@ export async function executeSkuImportRows(options: {
         status: previewRow.status,
         failureReason: previewRow.blockedReason ?? '预演未通过',
       });
+      emitRowProgress(index);
       continue;
     }
 
@@ -166,6 +176,7 @@ export async function executeSkuImportRows(options: {
           status: 'skipped_existing',
           failureReason: 'ERP 中已存在套装货号，将跳过创建',
         });
+        emitRowProgress(index);
         continue;
       }
 
@@ -183,9 +194,6 @@ export async function executeSkuImportRows(options: {
       const stickerBridge = await resolveStickerBridgeEntry(options.catalog, stickerCode, {
         title: previewRow.stickerTitle,
         brand: previewRow.brand,
-        component: normalized.component,
-        standard: normalized.standard,
-        picPath: imageUrl,
         itemCatName: previewRow.stickerCategory,
         unit: previewRow.stickerUnit,
       });
@@ -225,6 +233,7 @@ export async function executeSkuImportRows(options: {
         status: 'succeeded',
         failureReason: '',
       });
+      emitRowProgress(index);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       rowResults.push({
@@ -239,9 +248,20 @@ export async function executeSkuImportRows(options: {
         status: 'failed',
         failureReason: message,
       });
+      emitRowProgress(index);
     }
   }
 
+  options.onProgress?.({
+    stage: 'writeback',
+    taskId: options.sessionId,
+    filePath: options.filePath,
+    percent: 90,
+    message: '正在写回 Excel 创建结果',
+    currentRows: totalRows,
+    totalRows,
+    ...summarizeSkuImportExecuteRows(rowResults, totalRows),
+  });
   let updatedWorkbook = await applySkuImportWorkbookResults(
     options.parsed.workbookBuffer,
     options.parsed.sheetName,

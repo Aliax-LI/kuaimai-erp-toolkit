@@ -18,7 +18,7 @@ function resolveTestConfig(
 
   const companyId = input.erpCompanyId?.trim() || getSecret('erpCompanyId')?.trim();
   if (!companyId) {
-    return { error: '请先填写或保存 companyId' };
+    return { error: '请先填写或保存公司ID' };
   }
 
   const { erpBaseUrl } = getAppSettings();
