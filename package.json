@@ -26,6 +26,7 @@
     "make:linux": "node scripts/build-app.mjs && electron-builder --linux deb rpm --x64 --publish never",
     "make:win": "node scripts/build-app.mjs && electron-builder --win nsis --x64 --publish never",
     "make:mac": "node scripts/build-app.mjs && electron-builder --mac dmg zip --arm64 --publish never",
+    "make:mac:local": "node scripts/build-mac-local.mjs",
     "make:mac:universal": "node scripts/build-app.mjs && electron-builder --mac dmg zip --universal --publish never",
     "make:mac:x64": "node scripts/build-app.mjs && electron-builder --mac dmg zip --x64 --publish never",
     "icons:generate": "node scripts/generate-app-icons.mjs",
@@ -92,6 +93,8 @@
     "mac": {
       "icon": "resources/icon.icns",
       "category": "public.app-category.business",
+      "forceCodeSigning": true,
+      "hardenedRuntime": true,
       "target": [
         "dmg",
         "zip"

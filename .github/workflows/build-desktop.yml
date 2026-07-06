@@ -101,10 +101,10 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          if [ -z "$MACOS_CERTIFICATE_BASE64" ] || [ -z "$MACOS_CERTIFICATE_PASSWORD" ]; then
-            echo "Skipping macOS code signing because certificate secrets are not configured."
-            echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
-            exit 0
+          if [ -z "$MACOS_CERTIFICATE_BASE64" ] || [ -z "$MACOS_CERTIFICATE_PASSWORD" ] || [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "macOS release builds require signing and notarization secrets:"
+            echo "MACOS_CERTIFICATE_BASE64, MACOS_CERTIFICATE_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID"
+            exit 1
           fi
 
           CERTIFICATE_PATH="$RUNNER_TEMP/macos-signing-certificate.p12"
@@ -132,6 +132,18 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Verify macOS signature
+        shell: bash
+        run: |
+          APP_PATH="$(find out/make -maxdepth 3 -name '*.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app bundle found under out/make"
+            exit 1
+          fi
+
+          codesign --verify --deep --strict --verbose=4 "$APP_PATH"
+          spctl --assess --type execute --verbose=4 "$APP_PATH"
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4

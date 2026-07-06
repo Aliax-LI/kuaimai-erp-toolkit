@@ -6,3 +6,4 @@ out/
 tmp_*.js
 *.log
 src/renderer/.vite/
+.idea
