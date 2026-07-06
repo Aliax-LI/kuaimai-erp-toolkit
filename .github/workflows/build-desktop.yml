@@ -158,9 +158,11 @@ jobs:
   release:
     name: Publish Release
     if: |
-      startsWith(github.ref, 'refs/tags/v') ||
-      github.ref == 'refs/heads/main' ||
-      github.event_name == 'workflow_dispatch'
+      always() &&
+      needs.build-windows.result == 'success' &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       github.ref == 'refs/heads/main' ||
+       github.event_name == 'workflow_dispatch')
     needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
     permissions:
@@ -172,23 +174,29 @@ jobs:
       - name: Resolve release metadata
         id: meta
         shell: bash
+        env:
+          MACOS_RESULT: ${{ needs.build-macos.result }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           SHORT_SHA="${GITHUB_SHA:0:7}"
+          SUFFIX=""
+          if [[ "$MACOS_RESULT" != "success" ]]; then
+            SUFFIX=" (Windows only)"
+          fi
 
           if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/v* ]]; then
             echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-            echo "name=Release ${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "name=Release ${{ github.ref_name }}${SUFFIX}" >> "$GITHUB_OUTPUT"
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "tag=v${VERSION}-main.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-            echo "name=Pre-release main (${SHORT_SHA})" >> "$GITHUB_OUTPUT"
+            echo "name=Pre-release main (${SHORT_SHA})${SUFFIX}" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
             BRANCH="${GITHUB_REF#refs/heads/}"
             SAFE_BRANCH="${BRANCH//\//-}"
             echo "tag=v${VERSION}-${SAFE_BRANCH}.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
-            echo "name=Pre-release ${BRANCH} (${SHORT_SHA})" >> "$GITHUB_OUTPUT"
+            echo "name=Pre-release ${BRANCH} (${SHORT_SHA})${SUFFIX}" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -199,6 +207,7 @@ jobs:
           path: dist/windows
 
       - name: Download macOS artifacts
+        if: needs.build-macos.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: macos-${{ github.sha }}
@@ -210,6 +219,7 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.name }}
           prerelease: ${{ steps.meta.outputs.prerelease }}
+          fail_on_unmatched_files: false
           files: |
             dist/windows/**/*.exe
             dist/windows/**/*.blockmap
