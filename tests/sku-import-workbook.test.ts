@@ -1,5 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 
@@ -61,7 +59,7 @@ async function createFixtureWorkbook(): Promise<Buffer> {
   zip.file(
     'xl/sharedStrings.xml',
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="20" uniqueCount="20">
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="21" uniqueCount="21">
   <si><t>日期</t></si>
   <si><t>产品原品编码</t></si>
   <si><t>品牌</t></si>
@@ -74,14 +72,15 @@ async function createFixtureWorkbook(): Promise<Buffer> {
   <si><t>商品SKU货号</t></si>
   <si><t>成分</t></si>
   <si><t>执行标准</t></si>
-  <si><t>2026/06/23</t></si>
-  <si><t>YP-CJJ01-01</t></si>
+  <si><t>2026/06/29</t></si>
+  <si><t>YP-CWJ01-04</t></si>
   <si><t>WKAU</t></si>
-  <si><t>强力除胶剂</t></si>
-  <si><t>50ml</t></si>
-  <si><t>07460088</t></si>
-  <si><t>自粘袋 说明书</t></si>
-  <si><t>Composition: Water</t></si>
+  <si><t>除味剂</t></si>
+  <si><t>60ml</t></si>
+  <si><t>0957069011</t></si>
+  <si><t>自粘袋 说明书 白色按压喷头</t></si>
+  <si><t>Composition: Water、Sodium Gluconate、Sodium Bicarbonate、Glycerin、d-Limonene</t></si>
+  <si><t>Capacity:60ml</t></si>
 </sst>`,
   );
 
@@ -114,6 +113,7 @@ async function createFixtureWorkbook(): Promise<Buffer> {
       <c r="F2" t="s"><v>17</v></c>
       <c r="I2" t="s"><v>18</v></c>
       <c r="K2" t="s"><v>19</v></c>
+      <c r="L2" t="s"><v>20</v></c>
     </row>
     <row r="3"/>
   </sheetData>
@@ -194,14 +194,15 @@ describe('sku-import workbook', () => {
     expect(parsed.rows[0]).toMatchObject({
       rowNumber: 2,
       values: {
-        日期: '2026/06/23',
-        产品原品编码: 'YP-CJJ01-01',
+        日期: '2026/06/29',
+        产品原品编码: 'YP-CWJ01-04',
         品牌: 'WKAU',
-        产品名: '强力除胶剂',
-        容量: '50ml',
-        贴纸编码: '07460088',
-        配件: '自粘袋 说明书',
-        成分: 'Composition: Water',
+        产品名: '除味剂',
+        容量: '60ml',
+        贴纸编码: '0957069011',
+        配件: '自粘袋 说明书 白色按压喷头',
+        成分: 'Composition: Water、Sodium Gluconate、Sodium Bicarbonate、Glycerin、d-Limonene',
+        执行标准: 'Capacity:60ml',
       },
     });
     expect(parsed.rows[0].images).toHaveLength(1);
@@ -247,35 +248,5 @@ describe('sku-import workbook', () => {
     expect(reparsed.rows).toHaveLength(1);
     expect(reparsed.rows[0]?.values['商品SKU货号']).toBe('69-WKAU-CJJ001');
     expect(reparsed.rows[0]?.values['创建状态']).toBe('succeeded');
-  });
-
-  it('应解析上品记录 (1).xlsx 的新表格列', async () => {
-    const fixturePath = path.join(process.cwd(), '上品记录 (1).xlsx');
-    const workbook = fs.readFileSync(fixturePath);
-    const parsed = await parseSkuImportWorkbook(workbook, 'sheet1');
-
-    expect(parsed.headers).toEqual([
-      '日期',
-      '产品原品编码',
-      '品牌',
-      '产品名',
-      '容量',
-      '贴纸编码',
-      '贴纸备注',
-      '产品白底图-1',
-      '配件',
-      '商品SKU货号',
-      '成分',
-      '执行标准',
-    ]);
-    expect(parsed.rows[0]?.values).toMatchObject({
-      产品原品编码: 'YP-CWJ01-04',
-      品牌: 'WKAU',
-      产品名: '除味剂',
-      容量: '60ml',
-      贴纸编码: '0957069011',
-      配件: '自粘袋 说明书 白色按压喷头',
-    });
-    expect(parsed.rows[0]?.images.length).toBeGreaterThan(0);
   });
 });
