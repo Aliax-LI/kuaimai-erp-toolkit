@@ -81,12 +81,12 @@ async function resolveMatchedAccessorySkus(
 
   for (const entry of configMatches) {
     const items = await catalog.getItemsByOuterIds([entry.skuCode]);
-    const item = items.find((row) => row.outerId === entry.skuCode) ?? items[0];
+    const item = findCatalogItemByOuterId(items, entry.skuCode);
     if (!item?.outerId) {
       missing.push(`${entry.name}（ERP 未找到货号 ${entry.skuCode}）`);
       continue;
     }
-    const bridge = await catalog.buildBridgeEntryForOuterId(item.outerId);
+    const bridge = await catalog.buildBridgeEntryForOuterId(entry.skuCode);
     if (!bridge) {
       missing.push(`${entry.name}（无法解析 ERP 货号 ${entry.skuCode}）`);
       continue;
@@ -114,7 +114,7 @@ function previewRowBase(input: {
   matchedAccessorySkus: MatchedAccessorySku[];
   rules: ReturnType<typeof resolveSkuImportRules>;
 }): Omit<SkuImportPreviewRow, 'status' | 'blockedReason' | 'existingSkuCode'> {
-  const displayName = input.normalized.displayName || input.normalized.productName;
+  const displayName = `${input.normalized.productName}${input.normalized.capacity}`.replace(/\s+/g, '');
   return {
     rowNumber: input.rowNumber,
     businessKey: input.businessKey,
@@ -129,11 +129,12 @@ function previewRowBase(input: {
       input.normalized.brand,
       input.normalized.productName,
       input.normalized.capacity,
+      input.normalized.stickerRemark,
     ),
     bundleTitle: buildBundleTitle(
       input.normalized.brand,
       input.normalized.productName,
-      displayName,
+      input.normalized.capacity,
       input.accessories,
     ),
     matchedAccessoryCodes: input.accessoryMatch.matched,
@@ -349,7 +350,7 @@ export async function buildSkuImportPreview(
     rows.push({
       ...base,
       matchedAccessorySkus,
-      matchedAccessoryCodes: matchedAccessorySkus.map((item) => item.itemOuterId),
+      matchedAccessoryCodes: matchedAccessorySkus.map((item) => item.skuOuterId),
       status: 'pending',
       blockedReason:
         stickerExists && !bundleExists

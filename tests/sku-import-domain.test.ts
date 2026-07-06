@@ -7,6 +7,7 @@ import {
   buildStickerTitle,
   deriveProductNameInitials,
   isSkuImportDataRow,
+  normalizeImportRowValues,
   parseAccessoryNames,
   validateImportRow,
 } from '../src/tools/sku-import/domain';
@@ -17,14 +18,15 @@ describe('sku-import domain', () => {
     expect(parseAccessoryNames('自粘袋 说明书 自粘袋')).toEqual(['自粘袋', '说明书']);
   });
 
-  it('buildBusinessKey 应组合原品编码与贴纸编码', () => {
+  it('buildBusinessKey 应组合原品编码、贴纸编码、产品名与容量', () => {
     expect(
       buildBusinessKey({
         产品原品编码: 'YP-CJJ01-01',
         贴纸编码: '07460088',
-        名称: '除胶剂50g黑瓶喷雾',
+        产品名: '强力除胶剂',
+        容量: '50ml',
       }),
-    ).toBe('YP-CJJ01-01|07460088|除胶剂50g黑瓶喷雾');
+    ).toBe('YP-CJJ01-01|07460088|强力除胶剂|50ml');
   });
 
   it('deriveProductNameInitials 英文产品名取词首字母', () => {
@@ -50,31 +52,43 @@ describe('sku-import domain', () => {
     ).toBe('69-39-CDJJS-09590707');
   });
 
-  it('buildBundleTitle 应包含名称列容量包装信息', () => {
+  it('buildBundleTitle 应按品牌+产品名+容量与配件拼接', () => {
     expect(
-      buildBundleTitle('jokjok', '油污清洁剂', '30ml黑色pe瓶（跨境）', [
-        '自粘袋',
-        '跨境说明书',
-        '海绵',
-        '喷头',
-      ]),
-    ).toBe(
-      'jokjok油污清洁剂 - 30ml黑色pe瓶（跨境）*1+自粘袋*1+跨境说明书*1+海绵*1+喷头*1',
-    );
+      buildBundleTitle('WKAU', '除味剂', '60ml', ['自粘袋', '说明书', '白色按压喷头']),
+    ).toBe('WKAU除味剂60ml*1+自粘袋*1+说明书*1+白色按压喷头*1');
   });
 
-  it('buildBundleTitle 应去掉名称列开头重复的品牌与产品名', () => {
-    expect(
-      buildBundleTitle('WKAU', '布艺泡沫干洗剂', '布艺泡沫干洗剂30g喷剂', ['圆海绵']),
-    ).toBe('WKAU布艺泡沫干洗剂 - 30g喷剂*1+圆海绵*1');
-
-    expect(
-      buildBundleTitle('WKAU', '划痕蜡', 'WKAU划痕蜡', ['小圆棉']),
-    ).toBe('WKAU划痕蜡*1+小圆棉*1');
-  });
-
-  it('buildStickerTitle 应拼接贴纸名称', () => {
+  it('buildStickerTitle 无备注时应拼接基础贴纸名称', () => {
     expect(buildStickerTitle('WKAU', '强力除胶剂', '50ml')).toBe('WKAU强力除胶剂50ml贴纸');
+  });
+
+  it('buildStickerTitle 有备注时应追加贴纸备注', () => {
+    expect(buildStickerTitle('WKAU', '除味剂', '60ml', '跨境专用')).toBe(
+      'WKAU除味剂60ml贴纸-跨境专用',
+    );
+    expect(buildStickerTitle('WKAU', '除味剂', '60ml', ' ')).toBe('WKAU除味剂60ml贴纸');
+  });
+
+  it('normalizeImportRowValues 应解析新表格列', () => {
+    expect(
+      normalizeImportRowValues({
+        日期: '2026/06/29',
+        产品原品编码: 'YP-CWJ01-04',
+        品牌: 'WKAU',
+        产品名: '除味剂',
+        容量: '60ml',
+        贴纸编码: '0957069011',
+        贴纸备注: '跨境专用',
+        配件: '自粘袋 说明书',
+        成分: 'Water',
+        执行标准: 'Capacity:60ml',
+      }),
+    ).toMatchObject({
+      productCode: 'YP-CWJ01-04',
+      stickerRemark: '跨境专用',
+      displayName: '除味剂60ml',
+      accessoriesRaw: '自粘袋 说明书',
+    });
   });
 
   it('validateImportRow 应校验必填字段', () => {
@@ -86,7 +100,6 @@ describe('sku-import domain', () => {
         产品名: '强力除胶剂',
         容量: '50ml',
         贴纸编码: '07460088',
-        名称: '除胶剂50g黑瓶喷雾',
       }),
     ).toBeUndefined();
   });

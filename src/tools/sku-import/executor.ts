@@ -200,7 +200,7 @@ export async function executeSkuImportRows(options: {
 
       const accessoryBridges = await buildAccessoryBridgeEntries(
         options.catalog,
-        previewRow.matchedAccessoryCodes,
+        previewRow.matchedAccessorySkus.map((item) => item.skuOuterId),
       );
 
       const productOriginalBridge = await options.catalog.buildBridgeEntryForOuterId(

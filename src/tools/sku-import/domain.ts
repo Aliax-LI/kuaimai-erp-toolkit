@@ -4,7 +4,6 @@ import { pinyin } from 'pinyin-pro';
 const ACCESSORY_SPLIT_RE = /[\s,，、;；]+/;
 const CJK_RE = /[\u4e00-\u9fff]/;
 const LATIN_LETTER_RE = /[A-Za-z]/;
-const TITLE_SEPARATOR_RE = /^[\s\-—–_:：/\\|]+/;
 
 export function parseAccessoryNames(raw: string | undefined): string[] {
   if (!raw?.trim()) {
@@ -15,10 +14,15 @@ export function parseAccessoryNames(raw: string | undefined): string[] {
 }
 
 export function buildBusinessKey(values: Record<string, string>): string {
-  const productCode = values['产品原品编码']?.trim() ?? '';
-  const stickerCode = values['贴纸编码']?.trim() ?? '';
-  const displayName = values['名称']?.trim() ?? values['产品名']?.trim() ?? '';
-  return [productCode, stickerCode, displayName].filter(Boolean).join('|');
+  const normalized = normalizeImportRowValues(values);
+  return [
+    normalized.productCode,
+    normalized.stickerCode,
+    normalized.productName,
+    normalized.capacity,
+  ]
+    .filter(Boolean)
+    .join('|');
 }
 
 /** 产品名首字母大写：中文按拼音首字母，英文按词首字母，忽略数字与符号 */
@@ -81,48 +85,26 @@ export function buildStickerTitle(
   brand: string,
   productName: string,
   capacity: string,
+  stickerRemark?: string,
 ): string {
-  return `${brand}${productName}${capacity}贴纸`.replace(/\s+/g, '');
-}
-
-function trimLeadingTitleSeparators(value: string): string {
-  return value.replace(TITLE_SEPARATOR_RE, '').trim();
-}
-
-function stripLeadingTitleToken(value: string, token: string): string {
-  const normalizedToken = token.trim();
-  const trimmed = trimLeadingTitleSeparators(value);
-  if (!normalizedToken) {
-    return trimmed;
-  }
-
-  if (trimmed.toLowerCase().startsWith(normalizedToken.toLowerCase())) {
-    return trimLeadingTitleSeparators(trimmed.slice(normalizedToken.length));
-  }
-
-  return trimmed;
-}
-
-function buildBundlePrimaryTitle(brand: string, productName: string, displayName: string): string {
-  const baseTitle = `${brand}${productName}`.replace(/\s+/g, '');
-  const rawPackageLabel = displayName.trim() || productName.trim();
-  const packageLabel = stripLeadingTitleToken(
-    stripLeadingTitleToken(rawPackageLabel, brand),
-    productName,
-  );
-
-  return packageLabel ? `${baseTitle} - ${packageLabel}*1` : `${baseTitle}*1`;
+  const base = `${brand}${productName}${capacity}贴纸`.replace(/\s+/g, '');
+  const remark = stickerRemark?.trim().replace(/\s+/g, '');
+  return remark ? `${base}-${remark}` : base;
 }
 
 export function buildBundleTitle(
   brand: string,
   productName: string,
-  displayName: string,
+  capacity: string,
   accessories: string[],
+  quantity = 1,
 ): string {
   const parts = [
-    buildBundlePrimaryTitle(brand, productName, displayName),
-    ...accessories.map((item) => item.trim()).filter(Boolean).map((item) => `${item}*1`),
+    `${brand}${productName}${capacity}*${quantity}`.replace(/\s+/g, ''),
+    ...accessories
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => `${item}*${quantity}`),
   ];
   return parts.join('+');
 }
@@ -134,8 +116,7 @@ export function isSkuImportDataRow(values: Record<string, string>): boolean {
     normalized.brand ||
       normalized.productCode ||
       normalized.productName ||
-      normalized.stickerCode ||
-      normalized.displayName,
+      normalized.stickerCode,
   );
 }
 
@@ -145,19 +126,25 @@ export function normalizeImportRowValues(values: Record<string, string>): {
   productName: string;
   capacity: string;
   stickerCode: string;
+  stickerRemark: string;
   displayName: string;
   accessoriesRaw: string;
   component: string;
   standard: string;
   existingSkuCode: string;
 } {
+  const productName = values['产品名']?.trim() ?? '';
+  const capacity = values['容量']?.trim() ?? '';
+  const legacyDisplayName = values['名称']?.trim() ?? '';
+
   return {
     brand: values['品牌']?.trim() ?? '',
     productCode: values['产品原品编码']?.trim() ?? '',
-    productName: values['产品名']?.trim() ?? '',
-    capacity: values['容量']?.trim() ?? '',
+    productName,
+    capacity,
     stickerCode: values['贴纸编码']?.trim() ?? '',
-    displayName: values['名称']?.trim() ?? '',
+    stickerRemark: values['贴纸备注']?.trim() ?? '',
+    displayName: legacyDisplayName || `${productName}${capacity}`.replace(/\s+/g, ''),
     accessoriesRaw: values['配件']?.trim() ?? '',
     component: values['成分']?.trim() ?? '',
     standard: values['执行标准']?.trim() ?? '',
@@ -172,6 +159,5 @@ export function validateImportRow(values: Record<string, string>): string | unde
   if (!row.productName) return '缺少产品名';
   if (!row.capacity) return '缺少容量';
   if (!row.stickerCode) return '缺少贴纸编码';
-  if (!row.displayName && !row.productName) return '缺少名称';
   return undefined;
 }

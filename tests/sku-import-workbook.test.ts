@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import JSZip from 'jszip';
 import { describe, expect, it } from 'vitest';
 
@@ -59,21 +61,27 @@ async function createFixtureWorkbook(): Promise<Buffer> {
   zip.file(
     'xl/sharedStrings.xml',
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="14" uniqueCount="14">
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="20" uniqueCount="20">
   <si><t>日期</t></si>
   <si><t>产品原品编码</t></si>
   <si><t>品牌</t></si>
   <si><t>产品名</t></si>
   <si><t>容量</t></si>
   <si><t>贴纸编码</t></si>
+  <si><t>贴纸备注</t></si>
   <si><t>产品白底图-1</t></si>
+  <si><t>配件</t></si>
   <si><t>商品SKU货号</t></si>
+  <si><t>成分</t></si>
+  <si><t>执行标准</t></si>
   <si><t>2026/06/23</t></si>
   <si><t>YP-CJJ01-01</t></si>
   <si><t>WKAU</t></si>
   <si><t>强力除胶剂</t></si>
   <si><t>50ml</t></si>
   <si><t>07460088</t></si>
+  <si><t>自粘袋 说明书</t></si>
+  <si><t>Composition: Water</t></si>
 </sst>`,
   );
 
@@ -81,7 +89,7 @@ async function createFixtureWorkbook(): Promise<Buffer> {
     'xl/worksheets/sheet1.xml',
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <dimension ref="A1:H3"/>
+  <dimension ref="A1:L3"/>
   <sheetData>
     <row r="1">
       <c r="A1" t="s"><v>0</v></c>
@@ -92,14 +100,20 @@ async function createFixtureWorkbook(): Promise<Buffer> {
       <c r="F1" t="s"><v>5</v></c>
       <c r="G1" t="s"><v>6</v></c>
       <c r="H1" t="s"><v>7</v></c>
+      <c r="I1" t="s"><v>8</v></c>
+      <c r="J1" t="s"><v>9</v></c>
+      <c r="K1" t="s"><v>10</v></c>
+      <c r="L1" t="s"><v>11</v></c>
     </row>
     <row r="2">
-      <c r="A2" t="s"><v>8</v></c>
-      <c r="B2" t="s"><v>9</v></c>
-      <c r="C2" t="s"><v>10</v></c>
-      <c r="D2" t="s"><v>11</v></c>
-      <c r="E2" t="s"><v>12</v></c>
-      <c r="F2" t="s"><v>13</v></c>
+      <c r="A2" t="s"><v>12</v></c>
+      <c r="B2" t="s"><v>13</v></c>
+      <c r="C2" t="s"><v>14</v></c>
+      <c r="D2" t="s"><v>15</v></c>
+      <c r="E2" t="s"><v>16</v></c>
+      <c r="F2" t="s"><v>17</v></c>
+      <c r="I2" t="s"><v>18</v></c>
+      <c r="K2" t="s"><v>19</v></c>
     </row>
     <row r="3"/>
   </sheetData>
@@ -121,7 +135,7 @@ async function createFixtureWorkbook(): Promise<Buffer> {
 <xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
   <xdr:oneCellAnchor>
     <xdr:from>
-      <xdr:col>6</xdr:col>
+      <xdr:col>7</xdr:col>
       <xdr:colOff>0</xdr:colOff>
       <xdr:row>1</xdr:row>
       <xdr:rowOff>0</xdr:rowOff>
@@ -162,15 +176,19 @@ describe('sku-import workbook', () => {
     const parsed = await parseSkuImportWorkbook(workbook, 'sheet1');
 
     expect(parsed.sheetName).toBe('不是固定名称');
-    expect(parsed.headers.slice(0, 8)).toEqual([
+    expect(parsed.headers).toEqual([
       '日期',
       '产品原品编码',
       '品牌',
       '产品名',
       '容量',
       '贴纸编码',
+      '贴纸备注',
       '产品白底图-1',
+      '配件',
       '商品SKU货号',
+      '成分',
+      '执行标准',
     ]);
     expect(parsed.rows).toHaveLength(1);
     expect(parsed.rows[0]).toMatchObject({
@@ -182,11 +200,13 @@ describe('sku-import workbook', () => {
         产品名: '强力除胶剂',
         容量: '50ml',
         贴纸编码: '07460088',
+        配件: '自粘袋 说明书',
+        成分: 'Composition: Water',
       },
     });
     expect(parsed.rows[0].images).toHaveLength(1);
     expect(parsed.rows[0].images[0]).toMatchObject({
-      columnIndex: 6,
+      columnIndex: 7,
       contentType: 'image/png',
       fileName: 'image1.png',
     });
@@ -227,5 +247,35 @@ describe('sku-import workbook', () => {
     expect(reparsed.rows).toHaveLength(1);
     expect(reparsed.rows[0]?.values['商品SKU货号']).toBe('69-WKAU-CJJ001');
     expect(reparsed.rows[0]?.values['创建状态']).toBe('succeeded');
+  });
+
+  it('应解析上品记录 (1).xlsx 的新表格列', async () => {
+    const fixturePath = path.join(process.cwd(), '上品记录 (1).xlsx');
+    const workbook = fs.readFileSync(fixturePath);
+    const parsed = await parseSkuImportWorkbook(workbook, 'sheet1');
+
+    expect(parsed.headers).toEqual([
+      '日期',
+      '产品原品编码',
+      '品牌',
+      '产品名',
+      '容量',
+      '贴纸编码',
+      '贴纸备注',
+      '产品白底图-1',
+      '配件',
+      '商品SKU货号',
+      '成分',
+      '执行标准',
+    ]);
+    expect(parsed.rows[0]?.values).toMatchObject({
+      产品原品编码: 'YP-CWJ01-04',
+      品牌: 'WKAU',
+      产品名: '除味剂',
+      容量: '60ml',
+      贴纸编码: '0957069011',
+      配件: '自粘袋 说明书 白色按压喷头',
+    });
+    expect(parsed.rows[0]?.images.length).toBeGreaterThan(0);
   });
 });
