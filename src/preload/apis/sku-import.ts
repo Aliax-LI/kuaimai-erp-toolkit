@@ -3,6 +3,8 @@ import { ipcRenderer, webUtils } from 'electron';
 import { IPC_CHANNELS } from '@shared/ipc-channels';
 import type { SkuImportConfig } from '@shared/schemas/sku-import-config';
 import type {
+  AccessoryExportResult,
+  AccessoryImportResult,
   SkuImportExecuteProgress,
   SkuImportPreviewProgress,
   SkuImportTaskDetail,
@@ -48,6 +50,12 @@ export const skuImportApi = {
   setConfig: (config: SkuImportConfig): Promise<SkuImportConfig> =>
     ipcRenderer.invoke(IPC_CHANNELS.SKU_IMPORT_CONFIG_SET, config),
   getPathForFile: (file: File): string => webUtils.getPathForFile(file),
+  importAccessories: (): Promise<AccessoryImportResult | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SKU_IMPORT_IMPORT_ACCESSORIES),
+  exportAccessories: (): Promise<AccessoryExportResult | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SKU_IMPORT_EXPORT_ACCESSORIES),
+  downloadAccessoryTemplate: (): Promise<string | null> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SKU_IMPORT_DOWNLOAD_ACCESSORY_TEMPLATE),
 };
 
 export type SkuImportApi = typeof skuImportApi;
