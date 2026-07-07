@@ -1,5 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Hash, Package, Pen, Plus, PlugZap, Save, Search, Tag, Trash2 } from 'lucide-react';
+import {
+  Check,
+  Download,
+  FileDown,
+  Hash,
+  Package,
+  Pen,
+  Plus,
+  PlugZap,
+  Save,
+  Search,
+  Tag,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 import { Modal } from '@/components/shared/modal';
@@ -318,6 +332,43 @@ export function ConfigPage() {
     }
   };
 
+  const handleDownloadAccessoryTemplate = async () => {
+    try {
+      const filePath = await kuaimai.skuImport.downloadAccessoryTemplate();
+      if (filePath) {
+        toast('模板已保存');
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '下载失败');
+    }
+  };
+
+  const handleImportAccessories = async () => {
+    try {
+      const result = await kuaimai.skuImport.importAccessories();
+      if (result) {
+        toast(
+          `已导入：新增 ${result.added} 条，更新 ${result.updated} 条，跳过 ${result.skipped} 条无效行`,
+        );
+        await refresh();
+        setAccessoriesDirty(false);
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '导入失败');
+    }
+  };
+
+  const handleExportAccessories = async () => {
+    try {
+      const result = await kuaimai.skuImport.exportAccessories();
+      if (result) {
+        toast(`已导出至 ${result.filePath}`);
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '导出失败');
+    }
+  };
+
   const clearErpSecret = async (key: 'erpCookie' | 'erpCompanyId') => {
     await kuaimai.config.deleteSecrets([key]);
     if (key === 'erpCookie') {
@@ -611,6 +662,33 @@ export function ConfigPage() {
                 onChange={(event) => setAccessorySearch(event.target.value)}
               />
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="px-3 py-2"
+              onClick={() => void handleDownloadAccessoryTemplate()}
+            >
+              <Download className="h-4 w-4" />
+              下载模板
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="px-3 py-2"
+              onClick={() => void handleImportAccessories()}
+            >
+              <Upload className="h-4 w-4" />
+              导入
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="px-3 py-2"
+              onClick={() => void handleExportAccessories()}
+            >
+              <FileDown className="h-4 w-4" />
+              导出
+            </Button>
             <Button
               variant="dark"
               className="px-3 py-2"

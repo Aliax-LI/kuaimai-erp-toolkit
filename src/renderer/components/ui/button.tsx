@@ -3,7 +3,7 @@ import { forwardRef } from 'react';
 
 import { cn } from '@/lib/utils';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'dark';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'dark' | 'outline';
 
 interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'ref'> {
   variant?: ButtonVariant;
@@ -12,6 +12,7 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'ref'> {
 const variants: Record<ButtonVariant, string> = {
   primary: 'bg-amber text-white hover:bg-amber-dark',
   secondary: 'border border-beige bg-cream-white text-charcoal hover:bg-cream-warm',
+  outline: 'border border-beige bg-cream-white text-charcoal hover:bg-cream-warm',
   ghost: 'text-brown-soft hover:bg-cream-warm hover:text-charcoal',
   dark: 'bg-charcoal text-cream hover:bg-charcoal/90',
 };
