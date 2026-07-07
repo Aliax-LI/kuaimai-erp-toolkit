@@ -261,6 +261,67 @@ describe('buildSkuImportPreview', () => {
     ]);
   });
 
+  it('套装货号已存在时应 preview_blocked', async () => {
+    const catalog = mockCatalog({});
+    mockProductOriginal(catalog);
+    vi.mocked(catalog.getItemsByOuterIds).mockImplementation(async (ids: string[]) => {
+      const map: Record<string, { outerId: string; sysItemId: number; title: string }> = {
+        'YP-BYMPGXJ01': { outerId: 'YP-BYMPGXJ01', sysItemId: 50, title: '原品' },
+        '69-39-T-test0628': { outerId: '69-39-T-test0628', sysItemId: 200, title: '套装' },
+      };
+      return ids.filter((id) => map[id]).map((id) => map[id]);
+    });
+
+    const result = await buildSkuImportPreview(
+      's1',
+      '/tmp/x.xlsx',
+      baseParsed,
+      catalog,
+      testConfig,
+    );
+
+    expect(result.rows[0].status).toBe('preview_blocked');
+    expect(result.rows[0].blockedReason).toBe('ERP 中已存在套装货号，不允许导入');
+    expect(result.skippedCount).toBe(0);
+    expect(result.blockedCount).toBe(1);
+  });
+
+  it('贴纸已存在、套装不存在时应 pending 并提示复用', async () => {
+    const catalog = mockCatalog({
+      getItemsByOuterIds: vi.fn(async (ids: string[]) => {
+        const map: Record<string, { outerId: string; sysItemId: number; title: string }> = {
+          'YP-BYMPGXJ01': { outerId: 'YP-BYMPGXJ01', sysItemId: 50, title: '原品' },
+          test0628: { outerId: 'test0628', sysItemId: 150, title: '贴纸' },
+          'PJ-ZND01': { outerId: 'PJ-ZND01', sysItemId: 100, title: '自粘袋' },
+          'PJ-SMS01': { outerId: 'PJ-SMS01', sysItemId: 101, title: '说明书' },
+        };
+        return ids.filter((id) => map[id]).map((id) => map[id]);
+      }),
+      buildBridgeEntryForOuterId: vi.fn(async (outerId: string) => ({
+        subItemId: outerId === 'PJ-ZND01' ? 100 : outerId === 'PJ-SMS01' ? 101 : 50,
+        outerId:
+          outerId === 'PJ-ZND01'
+            ? 'PJ-ZND01-02'
+            : outerId === 'PJ-SMS01'
+              ? 'PJ-SMS01-01'
+              : outerId,
+        title: outerId,
+        ratio: 1,
+      })),
+    });
+
+    const result = await buildSkuImportPreview(
+      's1',
+      '/tmp/x.xlsx',
+      baseParsed,
+      catalog,
+      testConfig,
+    );
+
+    expect(result.rows[0].status).toBe('pending');
+    expect(result.rows[0].blockedReason).toBe('贴纸货号 test0628 已存在，执行时将复用');
+  });
+
   it('预演时应上报 ERP 查询与行匹配进度', async () => {
     const catalog = mockCatalog({});
     mockProductOriginal(catalog);

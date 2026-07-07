@@ -317,8 +317,8 @@ export async function buildSkuImportPreview(
         ...base,
         proposedSkuCode,
         existingSkuCode: proposedSkuCode,
-        status: 'skipped_existing',
-        blockedReason: 'ERP 中已存在套装货号，将跳过创建',
+        status: 'preview_blocked',
+        blockedReason: 'ERP 中已存在套装货号，不允许导入',
       });
       emitRowProgress(index);
       continue;
