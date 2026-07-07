@@ -81,6 +81,10 @@ export function buildBundleOuterId(
   return `${prefix}-${code}-${initials}-${sticker}`;
 }
 
+export function buildExecutionStandard(capacity: string): string {
+  return `Capacity:${capacity.trim()}`;
+}
+
 export function buildStickerTitle(
   brand: string,
   productName: string,
@@ -130,7 +134,6 @@ export function normalizeImportRowValues(values: Record<string, string>): {
   displayName: string;
   accessoriesRaw: string;
   component: string;
-  standard: string;
   existingSkuCode: string;
 } {
   const productName = values['产品名']?.trim() ?? '';
@@ -147,7 +150,6 @@ export function normalizeImportRowValues(values: Record<string, string>): {
     displayName: legacyDisplayName || `${productName}${capacity}`.replace(/\s+/g, ''),
     accessoriesRaw: values['配件']?.trim() ?? '',
     component: values['成分']?.trim() ?? '',
-    standard: values['执行标准']?.trim() ?? '',
     existingSkuCode: values['商品SKU货号']?.trim() ?? '',
   };
 }

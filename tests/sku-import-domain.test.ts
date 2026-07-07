@@ -4,6 +4,7 @@ import {
   buildBundleOuterId,
   buildBundleTitle,
   buildBusinessKey,
+  buildExecutionStandard,
   buildStickerTitle,
   deriveProductNameInitials,
   isSkuImportDataRow,
@@ -67,6 +68,22 @@ describe('sku-import domain', () => {
       'WKAU除味剂60ml贴纸-跨境专用',
     );
     expect(buildStickerTitle('WKAU', '除味剂', '60ml', ' ')).toBe('WKAU除味剂60ml贴纸');
+  });
+
+  it('buildExecutionStandard 应从容量生成执行标准', () => {
+    expect(buildExecutionStandard('60ml')).toBe('Capacity:60ml');
+    expect(buildExecutionStandard(' 60ml ')).toBe('Capacity:60ml');
+    expect(buildExecutionStandard('')).toBe('Capacity:');
+  });
+
+  it('normalizeImportRowValues 不再映射执行标准', () => {
+    const row = normalizeImportRowValues({
+      品牌: 'WKAU',
+      产品名: '除味剂',
+      容量: '60ml',
+      执行标准: 'Capacity:60ml',
+    });
+    expect(row).not.toHaveProperty('standard');
   });
 
   it('normalizeImportRowValues 应解析新表格列', () => {
