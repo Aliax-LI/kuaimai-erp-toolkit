@@ -47,7 +47,7 @@ export function readSkuImportConfigFile(filePath: string): SkuImportConfig | nul
   try {
     const raw = JSON.parse(fs.readFileSync(filePath, 'utf8')) as unknown;
     const parsed = skuImportConfigSchema.safeParse(raw);
-    return parsed.success ? normalizeSkuImportConfigWithDefaults(parsed.data) : null;
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
@@ -62,10 +62,15 @@ export function writeSkuImportConfigFile(filePath: string, config: SkuImportConf
   return parsed;
 }
 
+/** 仅用于从旧版/残缺配置首次迁移时补全默认品牌与配件 */
+export function bootstrapSkuImportConfigFromLegacy(config: SkuImportConfig): SkuImportConfig {
+  return normalizeSkuImportConfigWithDefaults(config);
+}
+
 export function loadSkuImportConfigFile(filePath: string): SkuImportConfig {
   const existing = readSkuImportConfigFile(filePath);
   if (existing) {
-    return writeSkuImportConfigFile(filePath, existing);
+    return existing;
   }
   return writeSkuImportConfigFile(filePath, DEFAULT_SKU_IMPORT_CONFIG);
 }

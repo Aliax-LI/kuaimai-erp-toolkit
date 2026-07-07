@@ -5,6 +5,7 @@ import { app, dialog, type BrowserWindow } from 'electron';
 
 import type { AccessoryExportResult, AccessoryImportResult } from '@shared/types/sku-import';
 import {
+  bootstrapSkuImportConfigFromLegacy,
   loadSkuImportConfigFile,
   resolvePackagedSkuImportConfigPath,
   resolveSkuImportConfigPath,
@@ -37,15 +38,13 @@ function getLegacySkuImportConfigFilePath(): string {
 
 function ensureSkuImportConfigMigrated(): void {
   const target = getSkuImportConfigFilePath();
-  const existing = readSkuImportConfigFile(target);
-  if (existing) {
-    writeSkuImportConfigFile(target, existing);
+  if (fs.existsSync(target)) {
     return;
   }
 
   const legacy = readSkuImportConfigFile(getLegacySkuImportConfigFilePath());
   if (legacy) {
-    writeSkuImportConfigFile(target, legacy);
+    writeSkuImportConfigFile(target, bootstrapSkuImportConfigFromLegacy(legacy));
   }
 }
 
