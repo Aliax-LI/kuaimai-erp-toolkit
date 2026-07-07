@@ -169,3 +169,13 @@ export interface SkuImportTaskDetail extends SkuImportTaskSummary {
   preview: SkuImportPreviewResult;
   executeResult?: SkuImportExecuteResult;
 }
+
+export interface AccessoryImportResult {
+  added: number;
+  updated: number;
+  skipped: number;
+}
+
+export interface AccessoryExportResult {
+  filePath: string;
+}
