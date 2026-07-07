@@ -7,7 +7,7 @@ import {
   type SkuImportPreviewRow,
 } from '@shared/types/sku-import';
 
-import { isSkuImportDataRow, normalizeImportRowValues } from './domain';
+import { buildExecutionStandard, isSkuImportDataRow, normalizeImportRowValues } from './domain';
 import type { ErpCatalogClient } from './erp-catalog';
 import type { SuiteBridgeEntry } from './erp-item-payload';
 import {
@@ -221,7 +221,7 @@ export async function executeSkuImportRows(options: {
         brand: previewRow.brand,
         itemCatName: previewRow.bundleCategory,
         component: normalized.component,
-        standard: normalized.standard,
+        standard: buildExecutionStandard(normalized.capacity),
         itemSuiteBridgeList: [productOriginalBridge, ...accessoryBridges, stickerBridge],
       });
 
