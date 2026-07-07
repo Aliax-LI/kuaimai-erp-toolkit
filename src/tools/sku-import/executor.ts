@@ -166,24 +166,6 @@ export async function executeSkuImportRows(options: {
     const stickerCode = previewRow.stickerOuterId;
 
     try {
-      const existingBundles = await options.catalog.getItemsByOuterIds([bundleOuterId]);
-      if (existingBundles.length > 0) {
-        rowResults.push({
-          rowNumber: previewRow.rowNumber,
-          skuCode: bundleOuterId,
-          status: 'skipped_existing',
-          failureReason: 'ERP 中已存在套装货号，将跳过创建',
-        });
-        pushWriteback({
-          rowNumber: previewRow.rowNumber,
-          skuCode: bundleOuterId,
-          status: 'skipped_existing',
-          failureReason: 'ERP 中已存在套装货号，将跳过创建',
-        });
-        emitRowProgress(index);
-        continue;
-      }
-
       let imageUrl: string | undefined;
       const image = sourceRow?.images[0];
       if (image) {
