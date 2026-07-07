@@ -54,12 +54,12 @@ describe('preview row labels', () => {
     expect(
       previewRowReason(
         baseRow({
-          status: 'skipped_existing',
+          status: 'preview_blocked',
           proposedSkuCode: 'test-69-WKAU-001',
-          blockedReason: 'ERP 中已存在套装货号，将跳过创建',
+          blockedReason: 'ERP 中已存在套装货号，不允许导入',
         }),
       ),
-    ).toBe('ERP 中已存在套装货号，将跳过创建');
+    ).toBe('ERP 中已存在套装货号，不允许导入');
 
     expect(
       previewRowBundleCode(

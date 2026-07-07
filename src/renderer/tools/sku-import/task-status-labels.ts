@@ -41,9 +41,6 @@ export function previewRowReason(row: SkuImportPreviewRow): string {
   if (row.status === 'preview_blocked') {
     return row.blockedReason ?? '预演未通过';
   }
-  if (row.status === 'skipped_existing') {
-    return 'ERP 中已存在套装货号，将跳过创建';
-  }
   if (row.status === 'pending') {
     if (row.blockedReason) {
       return row.blockedReason;
