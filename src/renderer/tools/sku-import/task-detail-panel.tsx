@@ -112,15 +112,22 @@ export function SkuImportTaskDetailPanel({ detail }: { detail: SkuImportTaskDeta
                   <td className="truncate px-3 py-2 font-medium">{row.brand}</td>
                   <td className="truncate px-3 py-2">{row.productName}</td>
                   <td className="truncate px-3 py-2 font-mono text-xs text-brown-soft">{row.stickerCode}</td>
-                  <td className="truncate px-3 py-2 font-mono text-xs text-brown-soft">{row.bundleCode}</td>
+                  <td
+                    className="truncate px-3 py-2 font-mono text-xs text-brown-soft"
+                    title={row.bundleCode !== '—' ? row.bundleCode : undefined}
+                  >
+                    {row.bundleCode}
+                  </td>
                   <td className="px-3 py-2">
                     <StatusBadge tone={executeRowStatusTone(row.status)}>
                       {rowStatusLabel(row.status)}
                     </StatusBadge>
                   </td>
-                  <td className="truncate px-3 py-2 text-xs text-brown-soft">{row.detailText}</td>
+                  <td className="truncate px-3 py-2 text-xs text-brown-soft" title={row.detailText}>
+                    {row.detailText}
+                  </td>
                   <td className="px-3 py-2">
-                    <CopyButton text={row.stickerCode} />
+                    <CopyButton text={row.bundleCode} />
                   </td>
                 </tr>
               ))}
@@ -160,15 +167,21 @@ export function SkuImportTaskDetailPanel({ detail }: { detail: SkuImportTaskDeta
             </tr>
           </thead>
           <tbody>
-            {detail.preview.rows.map((row) => (
+            {detail.preview.rows.map((row) => {
+              const bundleCode = previewRowBundleCode(row);
+              const reason = previewRowReason(row);
+              return (
               <tr key={row.rowNumber} className="border-b border-beige/50 hover:bg-cream-warm/30">
                 <td className="px-3 py-2 text-brown-soft">{row.rowNumber}</td>
                 <td className="truncate px-3 py-2 font-medium">{row.brand || '—'}</td>
                 <td className="truncate px-3 py-2">{row.productName || row.displayName || '—'}</td>
-                <td className="px-3 py-2 font-mono text-xs text-brown-soft">
-                  {previewRowBundleCode(row)}
+                <td
+                  className="truncate px-3 py-2 font-mono text-xs text-brown-soft"
+                  title={bundleCode !== '—' ? bundleCode : undefined}
+                >
+                  {bundleCode}
                 </td>
-                <td className="px-3 py-2 font-mono text-xs text-brown-soft">
+                <td className="truncate px-3 py-2 font-mono text-xs text-brown-soft">
                   {row.stickerOuterId || '—'}
                 </td>
                 <td className="px-3 py-2">
@@ -176,9 +189,12 @@ export function SkuImportTaskDetailPanel({ detail }: { detail: SkuImportTaskDeta
                     {rowStatusLabel(row.status)}
                   </StatusBadge>
                 </td>
-                <td className="truncate px-3 py-2 text-xs text-brown-soft">{previewRowReason(row)}</td>
+                <td className="truncate px-3 py-2 text-xs text-brown-soft" title={reason}>
+                  {reason}
+                </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

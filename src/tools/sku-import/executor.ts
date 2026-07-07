@@ -36,6 +36,9 @@ async function resolveStickerBridgeEntry(
 ): Promise<SuiteBridgeEntry> {
   const existing = await catalog.buildBridgeEntryForOuterId(stickerCode);
   if (existing) {
+    if (createPayload.picPath) {
+      await catalog.updateItemPicPath(existing.subItemId, createPayload.picPath);
+    }
     return existing;
   }
 
@@ -45,6 +48,7 @@ async function resolveStickerBridgeEntry(
     brand: createPayload.brand,
     itemCatName: createPayload.itemCatName,
     unit: createPayload.unit,
+    picPath: createPayload.picPath,
   });
 
   const created = await catalog.buildBridgeEntryForOuterId(stickerCode);
@@ -196,6 +200,7 @@ export async function executeSkuImportRows(options: {
         brand: previewRow.brand,
         itemCatName: previewRow.stickerCategory,
         unit: previewRow.stickerUnit,
+        picPath: imageUrl,
       });
 
       const accessoryBridges = await buildAccessoryBridgeEntries(
@@ -217,7 +222,6 @@ export async function executeSkuImportRows(options: {
         itemCatName: previewRow.bundleCategory,
         component: normalized.component,
         standard: normalized.standard,
-        picPath: imageUrl,
         itemSuiteBridgeList: [productOriginalBridge, ...accessoryBridges, stickerBridge],
       });
 

@@ -438,13 +438,19 @@ export function WorkbenchPage() {
               </tr>
             </thead>
             <tbody>
-              {taskDetail.preview.rows.map((row) => (
+              {taskDetail.preview.rows.map((row) => {
+                const bundleCode = previewRowBundleCode(row);
+                const reason = previewRowReason(row);
+                return (
                 <tr key={row.rowNumber} className="border-b border-beige/50 hover:bg-cream-warm/30">
                   <td className="px-3 py-2 text-brown-soft">{row.rowNumber}</td>
                   <td className="truncate px-3 py-2 font-medium">{row.brand || '—'}</td>
                   <td className="truncate px-3 py-2">{row.productName || row.displayName || '—'}</td>
-                  <td className="truncate px-3 py-2 font-mono text-xs text-brown-soft">
-                    {previewRowBundleCode(row)}
+                  <td
+                    className="truncate px-3 py-2 font-mono text-xs text-brown-soft"
+                    title={bundleCode !== '—' ? bundleCode : undefined}
+                  >
+                    {bundleCode}
                   </td>
                   <td className="truncate px-3 py-2 font-mono text-xs text-brown-soft">
                     {row.stickerOuterId || '—'}
@@ -476,11 +482,14 @@ export function WorkbenchPage() {
                         })}
                       </div>
                     ) : (
-                      <span className="block truncate">{previewRowReason(row)}</span>
+                      <span className="block truncate" title={reason}>
+                        {reason}
+                      </span>
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
