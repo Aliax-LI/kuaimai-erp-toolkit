@@ -13,7 +13,13 @@ import {
   pickSkuImportFile,
   previewSkuImportFile,
 } from '../../services/sku-import';
-import { getSkuImportConfig, setSkuImportConfig } from '../../services/sku-import-config';
+import {
+  downloadAccessoryTemplate,
+  exportAccessoriesToFile,
+  getSkuImportConfig,
+  importAccessoriesFromFile,
+  setSkuImportConfig,
+} from '../../services/sku-import-config';
 import { wrapIpcHandler } from '../wrap-ipc-handler';
 
 export function registerSkuImportIpc(): void {
@@ -85,5 +91,29 @@ export function registerSkuImportIpc(): void {
     wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_CONFIG_SET, async (_event, config: SkuImportConfig) =>
       setSkuImportConfig(config),
     ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.SKU_IMPORT_IMPORT_ACCESSORIES,
+    wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_IMPORT_ACCESSORIES, async (event) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      return importAccessoriesFromFile(win);
+    }),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.SKU_IMPORT_EXPORT_ACCESSORIES,
+    wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_EXPORT_ACCESSORIES, async (event) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      return exportAccessoriesToFile(win);
+    }),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.SKU_IMPORT_DOWNLOAD_ACCESSORY_TEMPLATE,
+    wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_DOWNLOAD_ACCESSORY_TEMPLATE, async (event) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      return downloadAccessoryTemplate(win);
+    }),
   );
 }
