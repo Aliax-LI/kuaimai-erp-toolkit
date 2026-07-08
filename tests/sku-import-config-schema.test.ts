@@ -42,4 +42,18 @@ describe('skuImportConfigSchema', () => {
     expect(parsed.rules.skuCodePrefix).toBe('');
     expect(parsed.rules.bundleCategoryName).toBe(DEFAULT_SKU_IMPORT_RULES.bundleCategoryName);
   });
+
+  it('default config has 16 brands with leading-zero codes', () => {
+    expect(DEFAULT_SKU_IMPORT_CONFIG.brands).toHaveLength(16);
+    expect(DEFAULT_SKU_IMPORT_CONFIG.brands[0]).toEqual({
+      name: 'KJM',
+      code: '04',
+      shortName: '',
+      enabled: true,
+    });
+    expect(DEFAULT_SKU_IMPORT_CONFIG.brands.find((b) => b.name === 'WKAU')?.code).toBe('39');
+    expect(DEFAULT_SKU_IMPORT_CONFIG.brands.find((b) => b.name === 'FAELUTE')?.code).toBe('42');
+    expect(DEFAULT_SKU_IMPORT_CONFIG.brands.some((b) => b.name === 'lovi')).toBe(false);
+    expect(DEFAULT_SKU_IMPORT_CONFIG.brands.some((b) => b.name === 'nimi')).toBe(false);
+  });
 });

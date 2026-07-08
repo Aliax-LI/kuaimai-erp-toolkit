@@ -66,9 +66,22 @@ export type SkuImportConfig = z.infer<typeof skuImportConfigSchema>;
 
 export const DEFAULT_SKU_IMPORT_CONFIG: SkuImportConfig = {
   brands: [
-    { name: 'wkau', code: '39', shortName: 'W', enabled: true },
-    { name: 'lovi', code: '42', shortName: 'L', enabled: true },
-    { name: 'nimi', code: '51', shortName: 'N', enabled: true },
+    { name: 'KJM', code: '04', shortName: '', enabled: true },
+    { name: 'TIGERRUN', code: '05', shortName: '', enabled: true },
+    { name: 'farienne', code: '10', shortName: '', enabled: true },
+    { name: 'LOORSAN', code: '13', shortName: '', enabled: true },
+    { name: 'WATE', code: '15', shortName: '', enabled: true },
+    { name: 'vvland', code: '26', shortName: '', enabled: true },
+    { name: 'ifubo', code: '35', shortName: '', enabled: true },
+    { name: 'BINOO', code: '36', shortName: '', enabled: true },
+    { name: 'jokjok', code: '37', shortName: '', enabled: true },
+    { name: 'WKAU', code: '39', shortName: '', enabled: true },
+    { name: 'FAELUTE', code: '42', shortName: '', enabled: true },
+    { name: 'shanrrow', code: '43', shortName: '', enabled: true },
+    { name: 'kineshinex', code: '44', shortName: '', enabled: true },
+    { name: 'AGDP', code: '45', shortName: '', enabled: true },
+    { name: 'Svayshiin', code: '46', shortName: '', enabled: true },
+    { name: 'SARKALMAN', code: '47', shortName: '', enabled: true },
   ],
   accessories: [
     { name: '面膜刷', skuCode: 'PJ-MMS01', brand: '', enabled: true },
