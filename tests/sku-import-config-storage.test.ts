@@ -57,7 +57,7 @@ describe('sku-import-config-storage', () => {
     });
 
     expect(bootstrapped.brands.some((brand) => brand.name === 'custom')).toBe(true);
-    expect(bootstrapped.brands.some((brand) => brand.name === 'wkau')).toBe(true);
+    expect(bootstrapped.brands.some((brand) => brand.name === 'WKAU')).toBe(true);
     expect(bootstrapped.accessories.some((accessory) => accessory.name === '自定义配件')).toBe(true);
     expect(bootstrapped.accessories.some((accessory) => accessory.name === '说明书')).toBe(true);
   });
