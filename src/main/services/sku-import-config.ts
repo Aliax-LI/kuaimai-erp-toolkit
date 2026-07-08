@@ -5,7 +5,9 @@ import { app, dialog, type BrowserWindow } from 'electron';
 
 import type { AccessoryExportResult, AccessoryImportResult } from '@shared/types/sku-import';
 import {
+  applyDefaultBrands,
   bootstrapSkuImportConfigFromLegacy,
+  loadDefaultSkuImportConfigFile,
   loadSkuImportConfigFile,
   resolvePackagedSkuImportConfigPath,
   resolveSkuImportConfigPath,
@@ -56,6 +58,12 @@ export function getSkuImportConfig(): SkuImportConfig {
 export function setSkuImportConfig(next: SkuImportConfig): SkuImportConfig {
   const config = skuImportConfigSchema.parse(next);
   return writeSkuImportConfigFile(getSkuImportConfigFilePath(), config);
+}
+
+export function resetBrandsFromDefaults(): SkuImportConfig {
+  const defaults = loadDefaultSkuImportConfigFile(getLegacySkuImportConfigFilePath());
+  const current = getSkuImportConfig();
+  return setSkuImportConfig(applyDefaultBrands(current, defaults));
 }
 
 export async function downloadAccessoryTemplate(

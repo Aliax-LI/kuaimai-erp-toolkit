@@ -5,10 +5,12 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  applyDefaultBrands,
   bootstrapSkuImportConfigFromLegacy,
+  loadDefaultSkuImportConfigFile,
   loadSkuImportConfigFile,
-  readSkuImportConfigFile,
   resolveSkuImportConfigPath,
+  readSkuImportConfigFile,
   writeSkuImportConfigFile,
 } from '../src/core/sku-import-config-storage';
 import { DEFAULT_SKU_IMPORT_CONFIG } from '@shared/schemas/sku-import-config';
@@ -90,5 +92,21 @@ describe('sku-import-config-storage', () => {
 
     expect(loaded.accessories).toHaveLength(0);
     expect(fs.statSync(filePath).mtimeMs).toBe(beforeMtime);
+  });
+
+  it('applyDefaultBrands 仅替换品牌列表', () => {
+    const current = {
+      brands: [{ name: 'custom', code: '99', shortName: '', enabled: true }],
+      accessories: [{ name: '自粘袋', skuCode: 'PJ-ZND01', brand: '', enabled: true }],
+      rules: { ...DEFAULT_SKU_IMPORT_CONFIG.rules },
+    };
+    const defaultsPath = resolveSkuImportConfigPath(process.cwd());
+    const defaults = loadDefaultSkuImportConfigFile(defaultsPath);
+
+    const result = applyDefaultBrands(current, defaults);
+
+    expect(result.brands).toEqual(defaults.brands);
+    expect(result.accessories).toEqual(current.accessories);
+    expect(result.rules).toEqual(current.rules);
   });
 });

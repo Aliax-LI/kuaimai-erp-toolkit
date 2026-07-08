@@ -18,6 +18,7 @@ import {
   exportAccessoriesToFile,
   getSkuImportConfig,
   importAccessoriesFromFile,
+  resetBrandsFromDefaults,
   setSkuImportConfig,
 } from '../../services/sku-import-config';
 import { wrapIpcHandler } from '../wrap-ipc-handler';
@@ -90,6 +91,13 @@ export function registerSkuImportIpc(): void {
     IPC_CHANNELS.SKU_IMPORT_CONFIG_SET,
     wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_CONFIG_SET, async (_event, config: SkuImportConfig) =>
       setSkuImportConfig(config),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.SKU_IMPORT_RESET_BRANDS_FROM_DEFAULTS,
+    wrapIpcHandler(IPC_CHANNELS.SKU_IMPORT_RESET_BRANDS_FROM_DEFAULTS, async () =>
+      resetBrandsFromDefaults(),
     ),
   );
 

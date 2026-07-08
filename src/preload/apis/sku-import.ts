@@ -49,6 +49,8 @@ export const skuImportApi = {
     ipcRenderer.invoke(IPC_CHANNELS.SKU_IMPORT_CONFIG_GET),
   setConfig: (config: SkuImportConfig): Promise<SkuImportConfig> =>
     ipcRenderer.invoke(IPC_CHANNELS.SKU_IMPORT_CONFIG_SET, config),
+  resetBrandsFromDefaults: (): Promise<SkuImportConfig> =>
+    ipcRenderer.invoke(IPC_CHANNELS.SKU_IMPORT_RESET_BRANDS_FROM_DEFAULTS),
   getPathForFile: (file: File): string => webUtils.getPathForFile(file),
   importAccessories: (): Promise<AccessoryImportResult | null> =>
     ipcRenderer.invoke(IPC_CHANNELS.SKU_IMPORT_IMPORT_ACCESSORIES),

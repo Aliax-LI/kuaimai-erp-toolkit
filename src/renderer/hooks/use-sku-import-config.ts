@@ -57,5 +57,25 @@ export function useSkuImportConfig() {
     [config, persist],
   );
 
-  return { config, loading, saving, refresh, saveBrands, saveAccessories, saveRules };
+  const resetBrandsFromDefaults = useCallback(async () => {
+    setSaving(true);
+    try {
+      const saved = await kuaimai.skuImport.resetBrandsFromDefaults();
+      setConfig(saved);
+      return saved;
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  return {
+    config,
+    loading,
+    saving,
+    refresh,
+    saveBrands,
+    saveAccessories,
+    saveRules,
+    resetBrandsFromDefaults,
+  };
 }

@@ -8,6 +8,7 @@ import {
   Pen,
   Plus,
   PlugZap,
+  RotateCcw,
   Save,
   Search,
   Tag,
@@ -73,7 +74,7 @@ export function ConfigPage() {
     return () => window.clearTimeout(timer);
   }, [saveSuccess]);
 
-  const { config, loading, saving: catalogSaving, refresh, saveBrands, saveAccessories, saveRules } =
+  const { config, loading, saving: catalogSaving, refresh, saveBrands, saveAccessories, saveRules, resetBrandsFromDefaults } =
     useSkuImportConfig();
   const [brandSearch, setBrandSearch] = useState('');
   const [accessorySearch, setAccessorySearch] = useState('');
@@ -371,6 +372,18 @@ export function ConfigPage() {
     }
   };
 
+  const handleResetBrandsFromDefaults = async () => {
+    try {
+      const saved = await resetBrandsFromDefaults();
+      setBrands(saved.brands);
+      setBrandsDirty(false);
+      setSaveSuccess(true);
+      toast(`已加载 ${saved.brands.length} 个默认品牌`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '初始化失败');
+    }
+  };
+
   const handleSaveAccessories = async () => {
     const invalid = accessories.find(
       (accessory) => !accessory.name.trim() || !accessory.skuCode.trim(),
@@ -629,6 +642,16 @@ export function ConfigPage() {
                 onChange={(event) => setBrandSearch(event.target.value)}
               />
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="px-3 py-2"
+              disabled={catalogSaving || loading}
+              onClick={() => void handleResetBrandsFromDefaults()}
+            >
+              <RotateCcw className="h-4 w-4" />
+              初始化品牌配置
+            </Button>
             <Button
               variant="dark"
               className="px-3 py-2"

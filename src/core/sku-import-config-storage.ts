@@ -74,3 +74,17 @@ export function loadSkuImportConfigFile(filePath: string): SkuImportConfig {
   }
   return writeSkuImportConfigFile(filePath, DEFAULT_SKU_IMPORT_CONFIG);
 }
+
+export function loadDefaultSkuImportConfigFile(defaultsPath: string): SkuImportConfig {
+  return readSkuImportConfigFile(defaultsPath) ?? DEFAULT_SKU_IMPORT_CONFIG;
+}
+
+export function applyDefaultBrands(
+  current: SkuImportConfig,
+  defaults: Pick<SkuImportConfig, 'brands'>,
+): SkuImportConfig {
+  return skuImportConfigSchema.parse({
+    ...current,
+    brands: defaults.brands,
+  });
+}

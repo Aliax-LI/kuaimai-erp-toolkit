@@ -22,6 +22,7 @@ export const IPC_CHANNELS = {
   SKU_IMPORT_EXPORT_RESULTS: 'sku-import:export-results',
   SKU_IMPORT_CONFIG_GET: 'sku-import:config-get',
   SKU_IMPORT_CONFIG_SET: 'sku-import:config-set',
+  SKU_IMPORT_RESET_BRANDS_FROM_DEFAULTS: 'sku-import:reset-brands-from-defaults',
   SKU_IMPORT_IMPORT_ACCESSORIES: 'sku-import:import-accessories',
   SKU_IMPORT_EXPORT_ACCESSORIES: 'sku-import:export-accessories',
   SKU_IMPORT_DOWNLOAD_ACCESSORY_TEMPLATE: 'sku-import:download-accessory-template',
