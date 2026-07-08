@@ -84,11 +84,40 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+function mapSkuRecord(sku: Record<string, unknown>) {
+  const skuOuterId = String(sku.outerId ?? sku.skuOuterId ?? '').trim();
+  if (!skuOuterId) {
+    return null;
+  }
+  return {
+    skuOuterId,
+    sysSkuId: typeof sku.sysSkuId === 'number' ? sku.sysSkuId : undefined,
+    title: typeof sku.propertiesName === 'string' ? sku.propertiesName : undefined,
+  };
+}
+
 function normalizeListItem(item: Record<string, unknown>): ErpCatalogItem | null {
   const outerId = String(item.outerId ?? item.skuOuterId ?? '').trim();
   const title = String(item.title ?? '').trim();
   const sysItemId = typeof item.sysItemId === 'number' ? item.sysItemId : undefined;
   const sysSkuId = typeof item.sysSkuId === 'number' ? item.sysSkuId : undefined;
+
+  const nestedSkus = item.skus ?? item.skuERP;
+  let skus: ErpCatalogItem['skus'];
+  if (Array.isArray(nestedSkus) && nestedSkus.length > 0) {
+    skus = nestedSkus
+      .filter((sku): sku is Record<string, unknown> => Boolean(sku) && typeof sku === 'object')
+      .map((sku) => mapSkuRecord(sku))
+      .filter((sku): sku is NonNullable<typeof sku> => sku !== null);
+  } else if (sysSkuId || outerId) {
+    skus = [
+      {
+        skuOuterId: String(item.skuOuterId ?? outerId),
+        sysSkuId,
+        title: typeof item.propertiesName === 'string' ? item.propertiesName : undefined,
+      },
+    ];
+  }
 
   if (!outerId && !title) {
     return null;
@@ -99,16 +128,13 @@ function normalizeListItem(item: Record<string, unknown>): ErpCatalogItem | null
     title,
     sysItemId,
     type: typeof item.type === 'string' ? item.type : undefined,
-    skus: sysSkuId || outerId
-      ? [
-          {
-            skuOuterId: String(item.skuOuterId ?? outerId),
-            sysSkuId,
-            title: typeof item.propertiesName === 'string' ? item.propertiesName : undefined,
-          },
-        ]
-      : undefined,
+    skus: skus && skus.length > 0 ? skus : undefined,
   };
+}
+
+/** @internal 仅供单测 */
+export function normalizeListItemForTest(item: Record<string, unknown>): ErpCatalogItem | null {
+  return normalizeListItem(item);
 }
 
 function normalizeListItems(raw: unknown): ErpCatalogItem[] {
@@ -233,6 +259,32 @@ export function createErpCatalogClient(config: ErpWebConfig): ErpCatalogClient {
       .filter((item): item is ErpCatalogItem => item !== null);
   }
 
+  async function querySingleByOuterId(text: string): Promise<ErpCatalogItem[]> {
+    const normalized = text.trim();
+    if (!normalized) {
+      return [];
+    }
+
+    const response = await client.querySingle({
+      text: normalized,
+      filterSysItemId: '',
+      content: 'outerId',
+      isAccurate: 0,
+      flag: 0,
+      order: 'desc',
+      purchasePriceScope: 0,
+      onSale: '',
+      pageSize: 50,
+      pageNo: 1,
+      api_name: 'item_querySingle',
+    });
+
+    return extractQuerySingleList(response)
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+      .map((item) => normalizeListItem(item))
+      .filter((item): item is ErpCatalogItem => item !== null);
+  }
+
   async function queryCatalogPage(pageNo: number, pageSize: number, filters: Record<string, string> = {}) {
     return client.queryListV2({
       pageNo,
@@ -330,7 +382,14 @@ export function createErpCatalogClient(config: ErpWebConfig): ErpCatalogClient {
             queryCatalogPage(1, 5, { [field]: outerId }),
           ),
         );
-        return responses.flatMap((response) => normalizeListItems(response));
+        const listHits = responses.flatMap((response) => normalizeListItems(response));
+
+        if (findCatalogItemByOuterId(listHits, outerId)) {
+          return listHits;
+        }
+
+        const singleHits = await querySingleByOuterId(outerId);
+        return [...listHits, ...singleHits];
       });
 
       for (const hits of lookupResults) {
