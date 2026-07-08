@@ -36,7 +36,7 @@ import type { ErpConnectionTestResult } from '@shared/types/erp-connection';
 
 const TAB_META: Record<ConfigTab, { label: string; icon: typeof Tag; description: string }> = {
   erp: { label: 'ERP 连接', icon: PlugZap, description: '登录凭证与服务地址' },
-  brands: { label: '品牌配置', icon: Tag, description: '品牌名称、编码与简称' },
+  brands: { label: '品牌配置', icon: Tag, description: '品牌名称与编码' },
   accessories: { label: '配件配置', icon: Package, description: '配件名称与 ERP SKU 编码' },
   rules: { label: '编码规则', icon: Hash, description: '货号生成规则' },
 };
@@ -94,6 +94,8 @@ export function ConfigPage() {
     value: string;
   } | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [selectedAccessoryIndexes, setSelectedAccessoryIndexes] = useState<Set<number>>(new Set());
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
 
   useEffect(() => {
     void kuaimai.config.getApp().then((app) => {
@@ -280,6 +282,60 @@ export function ConfigPage() {
       await saveAccessories(next);
       setAccessories(next);
       setAccessoriesDirty(false);
+      setSaveSuccess(true);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : '保存失败');
+    }
+  };
+
+  const toggleAccessorySelection = (index: number) => {
+    setSelectedAccessoryIndexes((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const visibleAccessoryIndexes = useMemo(
+    () => filteredAccessories.map(({ index }) => index),
+    [filteredAccessories],
+  );
+
+  const allVisibleSelected =
+    visibleAccessoryIndexes.length > 0 &&
+    visibleAccessoryIndexes.every((index) => selectedAccessoryIndexes.has(index));
+
+  const toggleSelectAllVisibleAccessories = () => {
+    setSelectedAccessoryIndexes((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        for (const index of visibleAccessoryIndexes) {
+          next.delete(index);
+        }
+      } else {
+        for (const index of visibleAccessoryIndexes) {
+          next.add(index);
+        }
+      }
+      return next;
+    });
+  };
+
+  const confirmBatchDeleteAccessories = async () => {
+    if (selectedAccessoryIndexes.size === 0) {
+      return;
+    }
+    const next = accessories.filter((_, index) => !selectedAccessoryIndexes.has(index));
+    try {
+      await saveAccessories(next);
+      setAccessories(next);
+      setAccessoriesDirty(false);
+      setSelectedAccessoryIndexes(new Set());
+      setBatchDeleteOpen(false);
       setSaveSuccess(true);
     } catch (err) {
       toast(err instanceof Error ? err.message : '保存失败');
@@ -587,14 +643,13 @@ export function ConfigPage() {
           </div>
           <div className="overflow-hidden border border-beige bg-cream-white">
             <div className="overflow-x-auto scrollbar-thin">
-              <table className="w-full min-w-[40rem] table-fixed text-sm">
+              <table className="w-full min-w-[32rem] table-fixed text-sm">
               <thead>
                 <tr className="border-b border-beige bg-cream/50">
-                  <th className="w-[28%] px-4 py-3 text-left font-medium text-brown-soft">品牌名称</th>
-                  <th className="w-[20%] px-4 py-3 text-left font-medium text-brown-soft">品牌编码</th>
-                  <th className="w-[20%] px-4 py-3 text-left font-medium text-brown-soft">名称简写</th>
-                  <th className="w-[14%] px-4 py-3 text-left font-medium text-brown-soft">状态</th>
-                  <th className="w-[18%] px-4 py-3 text-left font-medium text-brown-soft">操作</th>
+                  <th className="w-[34%] px-4 py-3 text-left font-medium text-brown-soft">品牌名称</th>
+                  <th className="w-[26%] px-4 py-3 text-left font-medium text-brown-soft">品牌编码</th>
+                  <th className="w-[18%] px-4 py-3 text-left font-medium text-brown-soft">状态</th>
+                  <th className="w-[22%] px-4 py-3 text-left font-medium text-brown-soft">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -602,7 +657,6 @@ export function ConfigPage() {
                   <tr key={index} className="border-b border-beige/50 hover:bg-cream-warm/30">
                     <td className="truncate px-4 py-3 font-medium">{brand.name}</td>
                     <td className="truncate px-4 py-3 font-mono text-xs">{brand.code}</td>
-                    <td className="truncate px-4 py-3">{brand.shortName || '—'}</td>
                     <td className="px-4 py-3">
                       <button type="button" onClick={() => void toggleBrand(index)}>
                         <StatusBadge tone={brand.enabled ? 'success' : 'neutral'}>
@@ -690,6 +744,16 @@ export function ConfigPage() {
               导出
             </Button>
             <Button
+              type="button"
+              variant="outline"
+              className="px-3 py-2 text-status-danger hover:border-status-danger/30 hover:bg-status-danger/5 hover:text-status-danger"
+              disabled={selectedAccessoryIndexes.size === 0}
+              onClick={() => setBatchDeleteOpen(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+              批量删除{selectedAccessoryIndexes.size > 0 ? `（${selectedAccessoryIndexes.size}）` : ''}
+            </Button>
+            <Button
               variant="dark"
               className="px-3 py-2"
               onClick={() => {
@@ -706,15 +770,31 @@ export function ConfigPage() {
               <table className="w-full min-w-[32rem] table-fixed text-sm">
               <thead>
                 <tr className="border-b border-beige bg-cream/50">
-                  <th className="w-[36%] px-4 py-3 text-left font-medium text-brown-soft">配件名称</th>
-                  <th className="w-[36%] px-4 py-3 text-left font-medium text-brown-soft">SKU 编码</th>
+                  <th className="w-[4%] px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleSelectAllVisibleAccessories}
+                      aria-label="全选可见配件"
+                    />
+                  </th>
+                  <th className="w-[32%] px-4 py-3 text-left font-medium text-brown-soft">配件名称</th>
+                  <th className="w-[32%] px-4 py-3 text-left font-medium text-brown-soft">SKU 编码</th>
                   <th className="w-[14%] px-4 py-3 text-left font-medium text-brown-soft">状态</th>
-                  <th className="w-[14%] px-4 py-3 text-left font-medium text-brown-soft">操作</th>
+                  <th className="w-[18%] px-4 py-3 text-left font-medium text-brown-soft">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAccessories.map(({ accessory, index }) => (
                   <tr key={index} className="border-b border-beige/50 hover:bg-cream-warm/30">
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedAccessoryIndexes.has(index)}
+                        onChange={() => toggleAccessorySelection(index)}
+                        aria-label={`选择配件 ${accessory.name}`}
+                      />
+                    </td>
                     <td className="truncate px-4 py-3 font-medium">{accessory.name}</td>
                     <td className="truncate px-4 py-3 font-mono text-xs">{accessory.skuCode}</td>
                     <td className="px-4 py-3">
@@ -846,19 +926,6 @@ export function ConfigPage() {
                 placeholder="例如 39"
               />
             </label>
-            <label className="block space-y-1">
-              <span className="text-sm font-medium text-charcoal">名称简写</span>
-              <Input
-                value={brandDraft.value.shortName}
-                onChange={(event) =>
-                  setBrandDraft({
-                    ...brandDraft,
-                    value: { ...brandDraft.value, shortName: event.target.value },
-                  })
-                }
-                placeholder="例如 W"
-              />
-            </label>
             <label className="flex items-center gap-2 text-sm text-charcoal">
               <input
                 type="checkbox"
@@ -960,6 +1027,30 @@ export function ConfigPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={batchDeleteOpen}
+        title="批量删除配件"
+        onClose={() => setBatchDeleteOpen(false)}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-charcoal">
+            确定删除已选的 {selectedAccessoryIndexes.size} 条配件？此操作不可撤销。
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setBatchDeleteOpen(false)}>
+              取消
+            </Button>
+            <Button
+              className="bg-status-danger text-cream-white hover:bg-status-danger/90"
+              onClick={() => void confirmBatchDeleteAccessories()}
+              disabled={catalogSaving}
+            >
+              {catalogSaving ? '删除中…' : '确定删除'}
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       <Modal
