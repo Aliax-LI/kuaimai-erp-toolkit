@@ -26,7 +26,11 @@ if (!fs.existsSync(svgPath)) {
 const pngBuffer = await sharp(svgPath).resize(512, 512).png().toBuffer();
 fs.writeFileSync(pngPath, pngBuffer);
 
-const icoBuffer = await pngToIco(pngBuffer);
+const icoSizes = [16, 32, 48, 64, 128, 256];
+const icoBuffers = await Promise.all(
+  icoSizes.map((size) => sharp(svgPath).resize(size, size).png().toBuffer()),
+);
+const icoBuffer = await pngToIco(icoBuffers);
 fs.writeFileSync(icoPath, icoBuffer);
 
 const icnsBuffer = png2icons.createICNS(pngBuffer, png2icons.BILINEAR, 0);
