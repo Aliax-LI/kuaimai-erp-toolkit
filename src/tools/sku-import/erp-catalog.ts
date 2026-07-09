@@ -102,7 +102,7 @@ function normalizeListItem(item: Record<string, unknown>): ErpCatalogItem | null
   const sysItemId = typeof item.sysItemId === 'number' ? item.sysItemId : undefined;
   const sysSkuId = typeof item.sysSkuId === 'number' ? item.sysSkuId : undefined;
 
-  const nestedSkus = item.skus ?? item.skuERP;
+  const nestedSkus = item.skus ?? item.skuERP ?? item.skuList;
   let skus: ErpCatalogItem['skus'];
   if (Array.isArray(nestedSkus) && nestedSkus.length > 0) {
     skus = nestedSkus
@@ -154,6 +154,26 @@ function normalizeListItems(raw: unknown): ErpCatalogItem[] {
     .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
     .map((item) => normalizeListItem(item))
     .filter((item): item is ErpCatalogItem => item !== null);
+}
+
+function mergeCatalogItemSkus(
+  target: ErpCatalogItem,
+  source: ErpCatalogItem,
+): void {
+  const skuByOuterId = new Map<string, NonNullable<ErpCatalogItem['skus']>[number]>();
+  for (const sku of target.skus ?? []) {
+    if (sku.skuOuterId) {
+      skuByOuterId.set(sku.skuOuterId, sku);
+    }
+  }
+  for (const sku of source.skus ?? []) {
+    if (!sku.skuOuterId || skuByOuterId.has(sku.skuOuterId)) {
+      continue;
+    }
+    skuByOuterId.set(sku.skuOuterId, sku);
+  }
+  const skus = [...skuByOuterId.values()];
+  target.skus = skus.length > 0 ? skus : target.skus;
 }
 
 function extractQuerySingleList(raw: unknown): unknown[] {
@@ -396,6 +416,13 @@ export function createErpCatalogClient(config: ErpWebConfig): ErpCatalogClient {
         for (const item of hits) {
           const key = item.outerId || String(item.sysItemId ?? '');
           if (!key || seen.has(key)) {
+            const existing = items.find((candidate) => {
+              const existingKey = candidate.outerId || String(candidate.sysItemId ?? '');
+              return existingKey === key;
+            });
+            if (existing) {
+              mergeCatalogItemSkus(existing, item);
+            }
             continue;
           }
           seen.add(key);
