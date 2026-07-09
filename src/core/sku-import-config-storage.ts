@@ -32,7 +32,7 @@ export function normalizeSkuImportConfigWithDefaults(config: SkuImportConfig): S
   return skuImportConfigSchema.parse({
     ...config,
     brands: mergeDefaultsByKey(config.brands, DEFAULT_SKU_IMPORT_CONFIG.brands),
-    accessories: mergeDefaultsByKey(config.accessories, DEFAULT_SKU_IMPORT_CONFIG.accessories),
+    accessories: config.accessories,
     rules: {
       ...DEFAULT_SKU_IMPORT_CONFIG.rules,
       ...config.rules,
@@ -62,7 +62,7 @@ export function writeSkuImportConfigFile(filePath: string, config: SkuImportConf
   return parsed;
 }
 
-/** 仅用于从旧版/残缺配置首次迁移时补全默认品牌与配件 */
+/** 仅用于从旧版/残缺配置首次迁移时补全默认品牌 */
 export function bootstrapSkuImportConfigFromLegacy(config: SkuImportConfig): SkuImportConfig {
   return normalizeSkuImportConfigWithDefaults(config);
 }

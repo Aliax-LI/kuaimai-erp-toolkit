@@ -83,10 +83,6 @@ export const DEFAULT_SKU_IMPORT_CONFIG: SkuImportConfig = {
     { name: 'Svayshiin', code: '46', shortName: '', enabled: true },
     { name: 'SARKALMAN', code: '47', shortName: '', enabled: true },
   ],
-  accessories: [
-    { name: '面膜刷', skuCode: 'PJ-MMS01', brand: '', enabled: true },
-    { name: '自粘袋', skuCode: 'PJ-ZND01', brand: '', enabled: true },
-    { name: '说明书', skuCode: 'PJ-SHMS01', brand: '', enabled: true },
-  ],
+  accessories: [],
   rules: { ...DEFAULT_SKU_IMPORT_RULES },
 };

@@ -51,7 +51,7 @@ describe('sku-import-config-storage', () => {
     expect(fs.existsSync(filePath)).toBe(true);
   });
 
-  it('bootstrapSkuImportConfigFromLegacy 应为旧配置补全默认品牌与配件', () => {
+  it('bootstrapSkuImportConfigFromLegacy 应为旧配置补全默认品牌，不追加默认配件', () => {
     const bootstrapped = bootstrapSkuImportConfigFromLegacy({
       brands: [{ name: 'custom', code: '88', shortName: 'C', enabled: true }],
       accessories: [{ name: '自定义配件', skuCode: 'PJ-CUSTOM', brand: 'old', enabled: true }],
@@ -60,11 +60,12 @@ describe('sku-import-config-storage', () => {
 
     expect(bootstrapped.brands.some((brand) => brand.name === 'custom')).toBe(true);
     expect(bootstrapped.brands.some((brand) => brand.name === 'WKAU')).toBe(true);
-    expect(bootstrapped.accessories.some((accessory) => accessory.name === '自定义配件')).toBe(true);
-    expect(bootstrapped.accessories.some((accessory) => accessory.name === '说明书')).toBe(true);
+    expect(bootstrapped.accessories).toEqual([
+      { name: '自定义配件', skuCode: 'PJ-CUSTOM', brand: 'old', enabled: true },
+    ]);
   });
 
-  it('读取已保存配置时不应补回已删除的默认配件', () => {
+  it('读取已保存配置时应原样保留配件列表', () => {
     const root = createTempRoot();
     const filePath = resolveSkuImportConfigPath(root);
     writeSkuImportConfigFile(filePath, {
@@ -74,9 +75,9 @@ describe('sku-import-config-storage', () => {
 
     const loaded = readSkuImportConfigFile(filePath);
 
-    expect(loaded?.accessories).toHaveLength(1);
-    expect(loaded?.accessories[0]?.name).toBe('自粘袋');
-    expect(loaded?.accessories.some((accessory) => accessory.name === '面膜刷')).toBe(false);
+    expect(loaded?.accessories).toEqual([
+      { name: '自粘袋', skuCode: 'PJ-ZND01', brand: '', enabled: true },
+    ]);
   });
 
   it('loadSkuImportConfigFile 不应在每次加载时重写磁盘文件', () => {

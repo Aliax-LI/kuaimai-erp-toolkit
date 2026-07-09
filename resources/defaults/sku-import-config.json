@@ -17,11 +17,7 @@
     { "name": "Svayshiin", "code": "46", "shortName": "", "enabled": true },
     { "name": "SARKALMAN", "code": "47", "shortName": "", "enabled": true }
   ],
-  "accessories": [
-    { "name": "面膜刷", "skuCode": "PJ-MMS01", "brand": "", "enabled": true },
-    { "name": "自粘袋", "skuCode": "PJ-ZND01", "brand": "", "enabled": true },
-    { "name": "说明书", "skuCode": "PJ-SHMS01", "brand": "", "enabled": true }
-  ],
+  "accessories": [],
   "rules": {
     "skuCodePrefix": "69",
     "bundleCategoryName": "家居清洗类（组合装）",
