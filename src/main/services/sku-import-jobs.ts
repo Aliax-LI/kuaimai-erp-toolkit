@@ -12,6 +12,7 @@ import type { ParsedSkuImportWorkbook } from '../../tools/sku-import/workbook';
 export interface SkuImportJobRecord {
   id: string;
   filePath: string;
+  resultFilePath?: string;
   parsed: Omit<ParsedSkuImportWorkbook, 'workbookBuffer'> & { workbookBuffer?: Buffer };
   preview: SkuImportPreviewResult;
   status: SkuImportTaskStatus;

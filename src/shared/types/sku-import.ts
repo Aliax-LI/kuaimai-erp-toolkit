@@ -152,6 +152,8 @@ export interface SkuImportTaskSummary {
   taskId: string;
   filePath: string;
   fileName: string;
+  /** 执行完成后写入的结果 Excel 副本（位于 userData/jobs/sku-import/results/） */
+  resultFilePath?: string;
   status: SkuImportTaskStatus;
   createdAt: string;
   updatedAt: string;

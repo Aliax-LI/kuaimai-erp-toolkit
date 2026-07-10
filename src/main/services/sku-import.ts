@@ -19,6 +19,11 @@ import { createErpWebClient } from '../../core/erp-web-client';
 import { createErpCatalogClient } from '../../tools/sku-import/erp-catalog';
 import { executeSkuImportRows } from '../../tools/sku-import/executor';
 import { buildSkuImportPreview } from '../../tools/sku-import/preview';
+import {
+  buildSkuImportResultExportDefaultPath,
+  buildSkuImportResultFilePath,
+  getSkuImportResultTaskDir,
+} from '../../tools/sku-import/result-file-path';
 import { getSkuImportConfig } from './sku-import-config';
 import { verifyCreatedSkuImportRow } from '../../tools/sku-import/verify-created-items';
 import {
@@ -81,7 +86,32 @@ let jobsDir = '';
 export function initSkuImportJobs(dir: string): void {
   jobsDir = dir;
   fs.mkdirSync(jobsDir, { recursive: true });
-  logger.info('sku-import', 'jobs dir ready', { jobsDir });
+  fs.mkdirSync(getSkuImportResultsDir(), { recursive: true });
+  logger.info('sku-import', 'jobs dir ready', { jobsDir, resultsDir: getSkuImportResultsDir() });
+}
+
+function getSkuImportResultsDir(): string {
+  return path.join(requireJobsDir(), 'results');
+}
+
+function deleteSkuImportResultArtifacts(taskId: string, resultFilePath?: string): void {
+  const taskDir = getSkuImportResultTaskDir(getSkuImportResultsDir(), taskId);
+  if (fs.existsSync(taskDir)) {
+    fs.rmSync(taskDir, { recursive: true, force: true });
+  }
+  if (resultFilePath && fs.existsSync(resultFilePath) && !resultFilePath.startsWith(taskDir)) {
+    fs.unlinkSync(resultFilePath);
+  }
+}
+
+function clearSkuImportResultArtifacts(): void {
+  const resultsDir = getSkuImportResultsDir();
+  if (!fs.existsSync(resultsDir)) {
+    return;
+  }
+  for (const entry of fs.readdirSync(resultsDir)) {
+    fs.rmSync(path.join(resultsDir, entry), { recursive: true, force: true });
+  }
 }
 
 function requireJobsDir(): string {
@@ -109,6 +139,7 @@ function toTaskSummary(task: SkuImportJobRecord): SkuImportTaskSummary {
     taskId: task.id,
     filePath: task.filePath,
     fileName: path.basename(task.filePath),
+    resultFilePath: task.resultFilePath,
     status: task.status,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
@@ -272,6 +303,7 @@ export async function clearAllSkuImportTasks(): Promise<{
   }
 
   const clearedTaskCount = clearSkuImportJobs(requireJobsDir());
+  clearSkuImportResultArtifacts();
   logger.info('sku-import', 'all tasks cleared', { clearedTaskCount, clearedFiles });
   return { clearedTaskCount, clearedFiles };
 }
@@ -281,6 +313,7 @@ export function deleteSkuImportTask(taskId: string): void {
   if (task.status === 'executing') {
     throw new Error('任务执行中，无法删除');
   }
+  deleteSkuImportResultArtifacts(taskId, task.resultFilePath);
   deleteSkuImportJob(requireJobsDir(), taskId);
   logger.info('sku-import', 'task deleted', { taskId });
 }
@@ -444,7 +477,36 @@ export async function executeSkuImportTask(
       onProgress: (progress) => emitExecuteProgress(onProgress, progress),
     });
 
-    writeWorkbookBuffer(task.filePath, updatedWorkbook);
+    const resultFilePath = buildSkuImportResultFilePath(
+      getSkuImportResultsDir(),
+      taskId,
+      task.filePath,
+    );
+    let writebackFailed: string | undefined;
+    emitExecuteProgress(onProgress, {
+      stage: 'writeback',
+      taskId,
+      filePath: resultFilePath,
+      percent: 88,
+      message: `正在写入结果副本：${path.basename(resultFilePath)}`,
+      currentRows: executeResult.rows.length,
+      totalRows: executeResult.rows.length,
+      ...summarizeSkuImportExecuteRows(executeResult.rows, task.preview.totalRows),
+    });
+    try {
+      fs.mkdirSync(path.dirname(resultFilePath), { recursive: true });
+      writeWorkbookBuffer(resultFilePath, updatedWorkbook);
+      task.resultFilePath = resultFilePath;
+    } catch (writeErr) {
+      writebackFailed =
+        writeErr instanceof Error ? writeErr.message : String(writeErr);
+      logger.warn('sku-import', 'result workbook write failed', {
+        taskId,
+        resultFilePath,
+        error: writebackFailed,
+      });
+    }
+
     task.parsed = {
       ...task.parsed,
       rows: parsed.rows,
@@ -457,7 +519,9 @@ export async function executeSkuImportTask(
     task.updatedAt = new Date().toISOString();
 
     const verifyFailedCount = task.executeResult.rows.filter((row) => row.verifyOk === false).length;
-    if (verifyFailedCount > 0) {
+    if (writebackFailed) {
+      task.failureMessage = `创建已完成，但结果 Excel 写入失败：${writebackFailed}。请点击「导出结果 Excel」重试。`;
+    } else if (verifyFailedCount > 0) {
       task.failureMessage = `${verifyFailedCount} 条记录结构验证未通过，请在 ERP 中检查`;
     }
 
@@ -469,13 +533,17 @@ export async function executeSkuImportTask(
       failedCount: task.executeResult.failedCount,
       skippedCount: task.executeResult.skippedCount,
       verifyFailedCount,
+      resultFilePath: task.resultFilePath,
+      writebackFailed: Boolean(writebackFailed),
     });
     emitExecuteProgress(onProgress, {
       stage: 'done',
       taskId,
-      filePath: task.filePath,
+      filePath: task.resultFilePath ?? task.filePath,
       percent: 100,
-      message: '创建完成',
+      message: task.resultFilePath
+        ? `创建完成，结果已写入 ${path.basename(task.resultFilePath)}`
+        : '创建完成',
       currentRows: task.executeResult.rows.length,
       totalRows: task.executeResult.rows.length,
       succeededCount: task.executeResult.succeededCount,
@@ -499,15 +567,23 @@ export async function executeSkuImportTask(
 
 export async function writeSkuImportResultsOnly(
   filePath: string,
+  taskId: string,
   results: Array<{ rowNumber: number; skuCode: string; status: string; failureReason: string }>,
-): Promise<void> {
+): Promise<string> {
   const workbookBuffer = readWorkbookBuffer(filePath);
   const updated = await applySkuImportWorkbookResults(
     workbookBuffer,
     SKU_IMPORT_SHEET_NAME,
     results,
   );
-  writeWorkbookBuffer(filePath, updated);
+  const resultFilePath = buildSkuImportResultFilePath(
+    getSkuImportResultsDir(),
+    taskId,
+    filePath,
+  );
+  fs.mkdirSync(path.dirname(resultFilePath), { recursive: true });
+  writeWorkbookBuffer(resultFilePath, updated);
+  return resultFilePath;
 }
 
 export async function exportSkuImportTaskResults(
@@ -531,8 +607,26 @@ export async function exportSkuImportTaskResults(
     })),
   );
   const finalWorkbook = await sweepGhostRowWritebacks(updated, parsed.sheetName);
-  const source = path.parse(task.filePath);
-  const defaultPath = path.join(source.dir, `${source.name}-创建结果${source.ext || '.xlsx'}`);
+  if (task.resultFilePath && fs.existsSync(task.resultFilePath)) {
+    const result = win
+      ? await dialog.showSaveDialog(win, {
+          defaultPath: buildSkuImportResultExportDefaultPath(task.filePath),
+          filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+        })
+      : await dialog.showSaveDialog({
+          defaultPath: buildSkuImportResultExportDefaultPath(task.filePath),
+          filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+        });
+
+    if (result.canceled || !result.filePath) {
+      return null;
+    }
+
+    fs.copyFileSync(task.resultFilePath, result.filePath);
+    return result.filePath;
+  }
+
+  const defaultPath = buildSkuImportResultExportDefaultPath(task.filePath);
   const result = win
     ? await dialog.showSaveDialog(win, {
         defaultPath,

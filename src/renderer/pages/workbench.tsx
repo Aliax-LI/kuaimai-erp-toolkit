@@ -207,6 +207,11 @@ export function WorkbenchPage() {
       const detail = await executeTask(taskDetail.taskId);
       setTaskDetail(detail);
       setExpandedStep('result');
+      if (detail.resultFilePath) {
+        toast(`创建完成，结果已写入 ${detail.resultFilePath.split(/[/\\]/).pop()}`);
+      } else if (detail.failureMessage) {
+        toast(detail.failureMessage);
+      }
     } catch (err) {
       const text = err instanceof Error ? err.message : String(err);
       setError(text);
@@ -221,7 +226,10 @@ export function WorkbenchPage() {
     }
     setError(null);
     try {
-      await exportResults(taskDetail.taskId);
+      const filePath = await exportResults(taskDetail.taskId);
+      if (filePath) {
+        toast('结果 Excel 已导出');
+      }
     } catch (err) {
       const text = err instanceof Error ? err.message : String(err);
       setError(text);
@@ -553,7 +561,7 @@ export function WorkbenchPage() {
             message={executeProgress?.message ?? '正在创建商品'}
           />
           <p className="text-sm text-brown-soft">
-            正在处理 {taskDetail.fileName}，完成后会显示创建结果并可导出 Excel。
+            正在处理 {taskDetail.fileName}，完成后会自动写入结果副本 Excel。
           </p>
         </div>
       );
@@ -567,10 +575,21 @@ export function WorkbenchPage() {
       <div className="space-y-4">
         <SkuImportTaskDetailPanel detail={taskDetail} />
 
+        {taskDetail.resultFilePath && (
+          <p className="text-sm text-brown-soft">
+            结果副本已保存（删除历史记录时会一并清除）：{taskDetail.resultFilePath}
+          </p>
+        )}
+        {taskDetail.failureMessage && (
+          <p className="border border-status-warning/20 bg-status-warning/5 px-3 py-2 text-sm text-status-warning">
+            {taskDetail.failureMessage}
+          </p>
+        )}
+
         <div className="flex flex-wrap items-center gap-3">
           <Button type="button" onClick={() => void handleExportResults()}>
             <FileSpreadsheet className="h-4 w-4" />
-            导出结果Excel
+            {taskDetail.resultFilePath ? '另存结果 Excel' : '导出结果 Excel'}
           </Button>
           <Button type="button" variant="secondary" disabled title="即将支持">
             <RotateCcw className="h-4 w-4" />

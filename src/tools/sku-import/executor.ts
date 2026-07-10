@@ -243,7 +243,7 @@ export async function executeSkuImportRows(options: {
     taskId: options.sessionId,
     filePath: options.filePath,
     percent: 90,
-    message: '正在写回 Excel 创建结果',
+    message: '正在写入结果副本',
     currentRows: totalRows,
     totalRows,
     ...summarizeSkuImportExecuteRows(rowResults, totalRows),
