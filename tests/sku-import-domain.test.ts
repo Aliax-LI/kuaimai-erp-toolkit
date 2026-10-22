@@ -59,6 +59,15 @@ describe('sku-import domain', () => {
     ).toBe('WKAU除味剂60ml*1+自粘袋*1+说明书*1+白色按压喷头*1');
   });
 
+  it('buildBundleTitle 应支持自定义数量', () => {
+    expect(
+      buildBundleTitle('WKAU', '除味剂', '60ml', ['自粘袋', '说明书'], 2),
+    ).toBe('WKAU除味剂60ml*2+自粘袋*2+说明书*2');
+    expect(
+      buildBundleTitle('WKAU', '穿戴甲胶水', '30ml', ['说明书', '白色按压喷头'], 3),
+    ).toBe('WKAU穿戴甲胶水30ml*3+说明书*3+白色按压喷头*3');
+  });
+
   it('buildStickerTitle 无备注时应拼接基础贴纸名称', () => {
     expect(buildStickerTitle('WKAU', '强力除胶剂', '50ml')).toBe('WKAU强力除胶剂50ml贴纸');
   });
@@ -105,6 +114,76 @@ describe('sku-import domain', () => {
       stickerRemark: '跨境专用',
       displayName: '除味剂60ml',
       accessoriesRaw: '自粘袋 说明书',
+      quantity: 1,
+    });
+  });
+
+  it('normalizeImportRowValues 应解析原品数量列', () => {
+    expect(
+      normalizeImportRowValues({
+        品牌: 'WKAU',
+        产品原品编码: 'YP-CWJ01-04',
+        产品名: '除味剂',
+        容量: '60ml',
+        贴纸编码: '0957069011',
+        原品数量: '2',
+      }),
+    ).toMatchObject({
+      quantity: 2,
+    });
+
+    expect(
+      normalizeImportRowValues({
+        品牌: 'WKAU',
+        产品原品编码: 'YP-CWJ01-04',
+        产品名: '除味剂',
+        容量: '60ml',
+        贴纸编码: '0957069011',
+        原品数量: '5',
+      }),
+    ).toMatchObject({
+      quantity: 5,
+    });
+
+    // 没有原品数量时默认为 1
+    expect(
+      normalizeImportRowValues({
+        品牌: 'WKAU',
+        产品原品编码: 'YP-CWJ01-04',
+        产品名: '除味剂',
+        容量: '60ml',
+        贴纸编码: '0957069011',
+      }),
+    ).toMatchObject({
+      quantity: 1,
+    });
+
+    // 无效值默认为 1
+    expect(
+      normalizeImportRowValues({
+        品牌: 'WKAU',
+        产品原品编码: 'YP-CWJ01-04',
+        产品名: '除味剂',
+        容量: '60ml',
+        贴纸编码: '0957069011',
+        原品数量: 'abc',
+      }),
+    ).toMatchObject({
+      quantity: 1,
+    });
+
+    // 负数或0会被转为1
+    expect(
+      normalizeImportRowValues({
+        品牌: 'WKAU',
+        产品原品编码: 'YP-CWJ01-04',
+        产品名: '除味剂',
+        容量: '60ml',
+        贴纸编码: '0957069011',
+        原品数量: '0',
+      }),
+    ).toMatchObject({
+      quantity: 1,
     });
   });
 

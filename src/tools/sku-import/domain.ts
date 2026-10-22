@@ -135,10 +135,13 @@ export function normalizeImportRowValues(values: Record<string, string>): {
   accessoriesRaw: string;
   component: string;
   existingSkuCode: string;
+  quantity: number;
 } {
   const productName = values['产品名']?.trim() ?? '';
   const capacity = values['容量']?.trim() ?? '';
   const legacyDisplayName = values['名称']?.trim() ?? '';
+  const quantityRaw = values['原品数量']?.trim() ?? '';
+  const quantity = quantityRaw ? Math.max(1, parseInt(quantityRaw, 10) || 1) : 1;
 
   return {
     brand: values['品牌']?.trim() ?? '',
@@ -151,6 +154,7 @@ export function normalizeImportRowValues(values: Record<string, string>): {
     accessoriesRaw: values['配件']?.trim() ?? '',
     component: values['成分']?.trim() ?? '',
     existingSkuCode: values['商品SKU货号']?.trim() ?? '',
+    quantity,
   };
 }
 

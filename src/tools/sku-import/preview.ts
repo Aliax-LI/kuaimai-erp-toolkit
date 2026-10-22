@@ -136,6 +136,7 @@ function previewRowBase(input: {
       input.normalized.productName,
       input.normalized.capacity,
       input.accessories,
+      input.normalized.quantity,
     ),
     matchedAccessoryCodes: input.accessoryMatch.matched,
     missingAccessoryNames: input.accessoryMatch.missing,
@@ -145,6 +146,7 @@ function previewRowBase(input: {
     bundleCategory: input.rules.bundleCategoryName,
     stickerCategory: STICKER_CATEGORY_NAME,
     stickerUnit: input.rules.stickerUnitName,
+    quantity: input.normalized.quantity,
   };
 }
 

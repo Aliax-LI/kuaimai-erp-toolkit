@@ -58,6 +58,7 @@ export interface SkuImportPreviewRow {
   bundleCategory: string;
   stickerCategory: string;
   stickerUnit: string;
+  quantity: number;
 }
 
 export interface SkuImportPreviewResult {

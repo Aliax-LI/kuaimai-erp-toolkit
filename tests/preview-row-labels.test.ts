@@ -30,6 +30,7 @@ function baseRow(overrides: Partial<SkuImportPreviewRow>): SkuImportPreviewRow {
     bundleCategory: '',
     stickerCategory: '',
     stickerUnit: '张',
+    quantity: 1,
     ...overrides,
   };
 }

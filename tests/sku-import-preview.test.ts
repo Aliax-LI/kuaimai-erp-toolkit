@@ -346,4 +346,111 @@ describe('buildSkuImportPreview', () => {
       }),
     );
   });
+
+  it('商品SKU货号列有值时应使用该货号并进行查重校验', async () => {
+    const customSkuCode = 'CUSTOM-SKU-001';
+    const parsedWithCustomSku: ParsedSkuImportWorkbook = {
+      ...baseParsed,
+      rows: [
+        {
+          rowNumber: 2,
+          values: {
+            ...validRowValues,
+            商品SKU货号: customSkuCode,
+          },
+          images: [],
+        },
+      ],
+    };
+
+    const catalog = mockCatalog({
+      getItemsByOuterIds: vi.fn(async (ids: string[]) => {
+        const map: Record<string, { outerId: string; sysItemId: number; title: string }> = {
+          'YP-BYMPGXJ01': { outerId: 'YP-BYMPGXJ01', sysItemId: 50, title: '原品' },
+          [customSkuCode]: { outerId: customSkuCode, sysItemId: 200, title: '已存在套装' },
+          'PJ-ZND01': { outerId: 'PJ-ZND01', sysItemId: 100, title: '自粘袋' },
+          'PJ-SMS01': { outerId: 'PJ-SMS01', sysItemId: 101, title: '说明书' },
+        };
+        return ids.filter((id) => map[id]).map((id) => map[id]);
+      }),
+      buildBridgeEntryForOuterId: vi.fn(async (outerId: string) => ({
+        subItemId: outerId === 'PJ-ZND01' ? 100 : outerId === 'PJ-SMS01' ? 101 : 50,
+        outerId:
+          outerId === 'PJ-ZND01'
+            ? 'PJ-ZND01-02'
+            : outerId === 'PJ-SMS01'
+              ? 'PJ-SMS01-01'
+              : outerId,
+        title: outerId,
+        ratio: 1,
+      })),
+    });
+
+    const result = await buildSkuImportPreview(
+      's1',
+      '/tmp/x.xlsx',
+      parsedWithCustomSku,
+      catalog,
+      testConfig,
+    );
+
+    // 应使用自定义货号
+    expect(result.rows[0].proposedSkuCode).toBe(customSkuCode);
+    // 应检测到货号已存在并阻断
+    expect(result.rows[0].status).toBe('preview_blocked');
+    expect(result.rows[0].blockedReason).toBe('ERP 中已存在套装货号，不允许导入');
+  });
+
+  it('商品SKU货号列有值且原品数量列有值时应正确组合', async () => {
+    const customSkuCode = 'CUSTOM-SKU-002';
+    const parsedWithBoth: ParsedSkuImportWorkbook = {
+      ...baseParsed,
+      rows: [
+        {
+          rowNumber: 2,
+          values: {
+            ...validRowValues,
+            商品SKU货号: customSkuCode,
+            原品数量: '3',
+          },
+          images: [],
+        },
+      ],
+    };
+
+    const catalog = mockCatalog({
+      getItemsByOuterIds: vi.fn(async (ids: string[]) => {
+        const map: Record<string, { outerId: string; sysItemId: number; title: string }> = {
+          'YP-BYMPGXJ01': { outerId: 'YP-BYMPGXJ01', sysItemId: 50, title: '原品' },
+          'PJ-ZND01': { outerId: 'PJ-ZND01', sysItemId: 100, title: '自粘袋' },
+          'PJ-SMS01': { outerId: 'PJ-SMS01', sysItemId: 101, title: '说明书' },
+        };
+        return ids.filter((id) => map[id]).map((id) => map[id]);
+      }),
+      buildBridgeEntryForOuterId: vi.fn(async (outerId: string) => ({
+        subItemId: outerId === 'PJ-ZND01' ? 100 : outerId === 'PJ-SMS01' ? 101 : 50,
+        outerId:
+          outerId === 'PJ-ZND01'
+            ? 'PJ-ZND01-02'
+            : outerId === 'PJ-SMS01'
+              ? 'PJ-SMS01-01'
+              : outerId,
+        title: outerId,
+        ratio: 1,
+      })),
+    });
+
+    const result = await buildSkuImportPreview(
+      's1',
+      '/tmp/x.xlsx',
+      parsedWithBoth,
+      catalog,
+      testConfig,
+    );
+
+    expect(result.rows[0].proposedSkuCode).toBe(customSkuCode);
+    expect(result.rows[0].quantity).toBe(3);
+    expect(result.rows[0].bundleTitle).toBe('WKAUtest30ml*3+自粘袋*3+说明书*3');
+    expect(result.rows[0].status).toBe('pending');
+  });
 });

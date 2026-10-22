@@ -197,6 +197,7 @@ export async function executeSkuImportRows(options: {
         throw new Error(`产品原品不存在或无法解析 bridge: ${previewRow.productOriginalOuterId}`);
       }
 
+      const quantity = previewRow.quantity;
       await options.catalog.createPureSuite({
         outerId: bundleOuterId,
         title: previewRow.bundleTitle,
@@ -204,7 +205,11 @@ export async function executeSkuImportRows(options: {
         itemCatName: previewRow.bundleCategory,
         component: normalized.component,
         standard: buildExecutionStandard(normalized.capacity),
-        itemSuiteBridgeList: [productOriginalBridge, ...accessoryBridges, stickerBridge],
+        itemSuiteBridgeList: [
+          { ...productOriginalBridge, ratio: quantity },
+          ...accessoryBridges.map((bridge) => ({ ...bridge, ratio: quantity })),
+          { ...stickerBridge, ratio: quantity },
+        ],
       });
 
       rowResults.push({
