@@ -69,6 +69,21 @@ describe('normalizeListItem sku arrays', () => {
 
     expect(item?.skus?.[0]?.skuOuterId).toBe('YP-ZBQXJ01-03');
   });
+
+  it('应从 skuList 数组映射规格商家编码', () => {
+    const item = normalizeListItemForTest({
+      outerId: 'YP-CXJ01',
+      title: '除锈剂',
+      sysItemId: 9,
+      skuList: [{ outerId: 'YP-CXJ01-17', sysSkuId: 17, propertiesName: '30ml增强款-白瓶' }],
+    });
+
+    expect(item?.skus?.[0]).toEqual({
+      skuOuterId: 'YP-CXJ01-17',
+      sysSkuId: 17,
+      title: '30ml增强款-白瓶',
+    });
+  });
 });
 
 describe('getItemsByOuterIds fallback', () => {
@@ -118,6 +133,29 @@ describe('getItemsByOuterIds fallback', () => {
     await catalog.getItemsByOuterIds(['PJ-ZND01']);
 
     expect(querySingle).not.toHaveBeenCalled();
+  });
+
+  it('同一主货号的规格应合并 skuList，而不是被先到的列表行盖掉', async () => {
+    queryListV2.mockResolvedValue({
+      list: [{ outerId: 'YP-CXJ01', title: '除锈剂', sysItemId: 9 }],
+    });
+    querySingle.mockImplementation(async (query: { text?: string }) => ({
+      list: [
+        {
+          outerId: 'YP-CXJ01',
+          title: '除锈剂',
+          sysItemId: 9,
+          skuList: [{ outerId: query.text, sysSkuId: 1, propertiesName: '规格' }],
+        },
+      ],
+    }));
+
+    const catalog = createErpCatalogClient(config);
+    const items = await catalog.getItemsByOuterIds(['YP-CXJ01-17', 'YP-CXJ01-10']);
+
+    expect(items).toHaveLength(1);
+    expect(findCatalogItemByOuterId(items, 'YP-CXJ01-17')?.outerId).toBe('YP-CXJ01');
+    expect(findCatalogItemByOuterId(items, 'YP-CXJ01-10')?.outerId).toBe('YP-CXJ01');
   });
 
   it('两者均无结果时返回空数组', async () => {

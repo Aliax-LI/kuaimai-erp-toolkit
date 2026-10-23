@@ -96,13 +96,48 @@ function mapSkuRecord(sku: Record<string, unknown>) {
   };
 }
 
+function readNestedSkuArray(item: Record<string, unknown>): unknown[] | undefined {
+  for (const key of ['skus', 'skuERP', 'skuList'] as const) {
+    const value = item[key];
+    if (Array.isArray(value) && value.length > 0) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+/** 同一主货号会先出现不含规格的列表行，再出现带 skuList 的 querySingle。丢掉后者会把规格编码判成不存在。 */
+function mergeCatalogItem(existing: ErpCatalogItem, incoming: ErpCatalogItem): ErpCatalogItem {
+  const skus = new Map<string, NonNullable<ErpCatalogItem['skus']>[number]>();
+  for (const sku of [...(existing.skus ?? []), ...(incoming.skus ?? [])]) {
+    const skuOuterId = sku.skuOuterId?.trim();
+    if (!skuOuterId) {
+      continue;
+    }
+    const prev = skus.get(skuOuterId);
+    skus.set(skuOuterId, {
+      skuOuterId,
+      sysSkuId: prev?.sysSkuId ?? sku.sysSkuId,
+      title: prev?.title || sku.title,
+    });
+  }
+  const mergedSkus = [...skus.values()];
+  return {
+    outerId: existing.outerId || incoming.outerId,
+    title: existing.title || incoming.title,
+    sysItemId: existing.sysItemId ?? incoming.sysItemId,
+    type: existing.type ?? incoming.type,
+    skus: mergedSkus.length > 0 ? mergedSkus : undefined,
+  };
+}
+
 function normalizeListItem(item: Record<string, unknown>): ErpCatalogItem | null {
   const outerId = String(item.outerId ?? item.skuOuterId ?? '').trim();
   const title = String(item.title ?? '').trim();
   const sysItemId = typeof item.sysItemId === 'number' ? item.sysItemId : undefined;
   const sysSkuId = typeof item.sysSkuId === 'number' ? item.sysSkuId : undefined;
 
-  const nestedSkus = item.skus ?? item.skuERP;
+  const nestedSkus = readNestedSkuArray(item);
   let skus: ErpCatalogItem['skus'];
   if (Array.isArray(nestedSkus) && nestedSkus.length > 0) {
     skus = nestedSkus
@@ -373,8 +408,7 @@ export function createErpCatalogClient(config: ErpWebConfig): ErpCatalogClient {
         return [];
       }
 
-      const items: ErpCatalogItem[] = [];
-      const seen = new Set<string>();
+      const merged = new Map<string, ErpCatalogItem>();
 
       const lookupResults = await mapWithConcurrency(unique, OUTER_ID_LOOKUP_CONCURRENCY, async (outerId) => {
         const responses = await Promise.all(
@@ -395,14 +429,14 @@ export function createErpCatalogClient(config: ErpWebConfig): ErpCatalogClient {
       for (const hits of lookupResults) {
         for (const item of hits) {
           const key = item.outerId || String(item.sysItemId ?? '');
-          if (!key || seen.has(key)) {
+          if (!key) {
             continue;
           }
-          seen.add(key);
-          items.push(item);
+          const prev = merged.get(key);
+          merged.set(key, prev ? mergeCatalogItem(prev, item) : item);
         }
       }
-      return items;
+      return [...merged.values()];
     },
 
     async findItemsByTitleKeyword(keyword: string, limit = 20): Promise<ErpCatalogItem[]> {
