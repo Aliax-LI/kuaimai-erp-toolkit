@@ -96,6 +96,11 @@ export function buildStickerTitle(
   return remark ? `${base}-${remark}` : base;
 }
 
+/** 配件组合数量：默认 1，名称含「喷」时与原品数量一致 */
+export function accessoryRatio(name: string, productQuantity: number): number {
+  return name.includes('喷') ? productQuantity : 1;
+}
+
 export function buildBundleTitle(
   brand: string,
   productName: string,
@@ -108,7 +113,7 @@ export function buildBundleTitle(
     ...accessories
       .map((item) => item.trim())
       .filter(Boolean)
-      .map((item) => `${item}*${quantity}`),
+      .map((item) => `${item}*${accessoryRatio(item, quantity)}`),
   ];
   return parts.join('+');
 }

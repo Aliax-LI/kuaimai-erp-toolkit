@@ -59,13 +59,13 @@ describe('sku-import domain', () => {
     ).toBe('WKAU除味剂60ml*1+自粘袋*1+说明书*1+白色按压喷头*1');
   });
 
-  it('buildBundleTitle 应支持自定义数量', () => {
+  it('buildBundleTitle 配件默认 1，名称含喷时跟随原品数量', () => {
     expect(
       buildBundleTitle('WKAU', '除味剂', '60ml', ['自粘袋', '说明书'], 2),
-    ).toBe('WKAU除味剂60ml*2+自粘袋*2+说明书*2');
+    ).toBe('WKAU除味剂60ml*2+自粘袋*1+说明书*1');
     expect(
       buildBundleTitle('WKAU', '穿戴甲胶水', '30ml', ['说明书', '白色按压喷头'], 3),
-    ).toBe('WKAU穿戴甲胶水30ml*3+说明书*3+白色按压喷头*3');
+    ).toBe('WKAU穿戴甲胶水30ml*3+说明书*1+白色按压喷头*3');
   });
 
   it('buildStickerTitle 无备注时应拼接基础贴纸名称', () => {

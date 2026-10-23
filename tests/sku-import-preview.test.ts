@@ -450,7 +450,7 @@ describe('buildSkuImportPreview', () => {
 
     expect(result.rows[0].proposedSkuCode).toBe(customSkuCode);
     expect(result.rows[0].quantity).toBe(3);
-    expect(result.rows[0].bundleTitle).toBe('WKAUtest30ml*3+自粘袋*3+说明书*3');
+    expect(result.rows[0].bundleTitle).toBe('WKAUtest30ml*3+自粘袋*1+说明书*1');
     expect(result.rows[0].status).toBe('pending');
   });
 });

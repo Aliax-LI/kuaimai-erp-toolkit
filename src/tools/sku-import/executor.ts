@@ -7,7 +7,12 @@ import {
   type SkuImportPreviewRow,
 } from '@shared/types/sku-import';
 
-import { buildExecutionStandard, isSkuImportDataRow, normalizeImportRowValues } from './domain';
+import {
+  accessoryRatio,
+  buildExecutionStandard,
+  isSkuImportDataRow,
+  normalizeImportRowValues,
+} from './domain';
 import type { ErpCatalogClient } from './erp-catalog';
 import type { SuiteBridgeEntry } from './erp-item-payload';
 import {
@@ -207,7 +212,10 @@ export async function executeSkuImportRows(options: {
         standard: buildExecutionStandard(normalized.capacity),
         itemSuiteBridgeList: [
           { ...productOriginalBridge, ratio: quantity },
-          ...accessoryBridges.map((bridge) => ({ ...bridge, ratio: quantity })),
+          ...accessoryBridges.map((bridge, index) => ({
+            ...bridge,
+            ratio: accessoryRatio(previewRow.matchedAccessorySkus[index]?.name ?? '', quantity),
+          })),
           { ...stickerBridge, ratio: quantity },
         ],
       });
