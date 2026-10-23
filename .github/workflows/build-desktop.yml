@@ -102,9 +102,11 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           if [ -z "$MACOS_CERTIFICATE_BASE64" ] || [ -z "$MACOS_CERTIFICATE_PASSWORD" ] || [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
-            echo "macOS release builds require signing and notarization secrets:"
+            echo "macOS signing secrets not configured; building unsigned artifacts for internal testing."
+            echo "To enable signed + notarized builds, configure repository secrets:"
             echo "MACOS_CERTIFICATE_BASE64, MACOS_CERTIFICATE_PASSWORD, APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID"
-            exit 1
+            echo "MACOS_SIGNING_ENABLED=false" >> "$GITHUB_ENV"
+            exit 0
           fi
 
           CERTIFICATE_PATH="$RUNNER_TEMP/macos-signing-certificate.p12"
@@ -120,20 +122,28 @@ jobs:
           security default-keychain -s "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
+          echo "MACOS_SIGNING_ENABLED=true" >> "$GITHUB_ENV"
           echo "CSC_IDENTITY_AUTO_DISCOVERY=true" >> "$GITHUB_ENV"
           if [ -n "$MACOS_CODESIGN_IDENTITY" ]; then
             echo "CSC_NAME=$MACOS_CODESIGN_IDENTITY" >> "$GITHUB_ENV"
           fi
 
       - name: Build macOS package
-        run: pnpm run make:mac
+        shell: bash
         env:
           CI: true
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ "${MACOS_SIGNING_ENABLED:-false}" = "true" ]; then
+            pnpm run make:mac
+          else
+            pnpm run make:mac:local
+          fi
 
       - name: Verify macOS signature
+        if: env.MACOS_SIGNING_ENABLED == 'true'
         shell: bash
         run: |
           APP_PATH="$(find out/make -maxdepth 3 -name '*.app' -print -quit)"
